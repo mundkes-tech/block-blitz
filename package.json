@@ -1,0 +1,26 @@
+
+{
+  "name": "block-blitz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A full-stack browser-based block puzzle game",
+  "scripts": {
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "tsx server/src/index.ts",
+    "build:client": "npm --prefix client run build",
+    "build:server": "tsc -p server/tsconfig.json"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
