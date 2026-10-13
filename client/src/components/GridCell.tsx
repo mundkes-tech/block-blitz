@@ -1,11 +1,14 @@
 type GridCellProps = {
   occupied: boolean
+  preview?: 'valid' | 'invalid'
 }
 
-function GridCell({ occupied }: GridCellProps) {
+function GridCell({ occupied, preview }: GridCellProps) {
+  const previewClass = preview ? ` grid-cell--preview-${preview}` : ''
+
   return (
     <div
-      className={`grid-cell${occupied ? ' grid-cell--occupied' : ''}`}
+      className={`grid-cell${occupied ? ' grid-cell--occupied' : ''}${previewClass}`}
       aria-label={occupied ? 'Occupied cell' : 'Empty cell'}
     />
   )
