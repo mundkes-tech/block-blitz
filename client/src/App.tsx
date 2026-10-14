@@ -5,6 +5,11 @@ import { BOARD_SIZE, createEmptyBoard, type Board } from './game/board'
 import { clearCompletedLines } from './game/lines'
 import { canPlaceShape, placeShape } from './game/placement'
 import { generatePieces, type Piece } from './game/shapes'
+import { isGameOver } from './game/gameOver'
+import {
+  calculatePlacementScore,
+  updateCombo,
+} from './game/scoring'
 import './App.css'
 
 type ActiveDrag = {
@@ -14,7 +19,10 @@ type ActiveDrag = {
 
 function App() {
   const [board, setBoard] = useState<Board>(createEmptyBoard)
-  const [pieces] = useState<Piece[]>(generatePieces)
+  const [pieces, setPieces] = useState<Piece[]>(generatePieces)
+  const [score, setScore] = useState(0)
+  const [combo, setCombo] = useState(0)
+  const [gameOver, setGameOver] = useState(false)
   const [preview, setPreview] = useState<BoardPreview | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const activeDragRef = useRef<ActiveDrag | null>(null)
@@ -76,6 +84,10 @@ function App() {
     piece: Piece,
     event: PointerEvent<HTMLDivElement>,
   ) => {
+    if (gameOver) {
+      return
+    }
+
     event.preventDefault()
     activeDragRef.current = { piece, pointerId: event.pointerId }
     updatePreview(piece, event.clientX, event.clientY)
@@ -106,20 +118,45 @@ function App() {
       return
     }
 
-    if (currentPreview?.valid) {
-      setBoard((currentBoard) => {
-        const placedBoard = placeShape(
-          currentBoard,
-          activeDrag.piece.shape,
-          currentPreview.row,
-          currentPreview.col,
-        )
+    if (currentPreview?.valid && pieces.some(({ id }) => id === activeDrag.piece.id)) {
+      const placedBoard = placeShape(
+        board,
+        activeDrag.piece.shape,
+        currentPreview.row,
+        currentPreview.col,
+      )
+      const cleared = clearCompletedLines(placedBoard)
+      const clearedLineCount =
+        cleared.clearedRows.length + cleared.clearedColumns.length
+      const remainingPieces = pieces.filter(
+        ({ id }) => id !== activeDrag.piece.id,
+      )
+      const nextPieces =
+        remainingPieces.length === 0 ? generatePieces() : remainingPieces
 
-        return clearCompletedLines(placedBoard).board
-      })
+      setBoard(cleared.board)
+      setPieces(nextPieces)
+      setScore((currentScore) =>
+        currentScore +
+        calculatePlacementScore(
+          activeDrag.piece.shape.cells.length,
+          clearedLineCount,
+        ),
+      )
+      setCombo((currentCombo) => updateCombo(currentCombo, clearedLineCount))
+      setGameOver(isGameOver(cleared.board, nextPieces))
     }
 
     clearDrag()
+  }
+
+  const restartGame = () => {
+    clearDrag()
+    setBoard(createEmptyBoard())
+    setPieces(generatePieces())
+    setScore(0)
+    setCombo(0)
+    setGameOver(false)
   }
 
   return (
@@ -129,6 +166,18 @@ function App() {
         <h1>BLOCK BLITZ</h1>
         <p className="subtitle">Build your best board, one block at a time.</p>
       </header>
+      <section className="score-panel" aria-label="Game score">
+        <div>
+          <span className="score-label">SCORE</span>
+          <strong>{score}</strong>
+        </div>
+        {combo > 0 && (
+          <div className="combo-feedback" aria-live="polite">
+            <span className="score-label">COMBO</span>
+            <strong>{combo}x</strong>
+          </div>
+        )}
+      </section>
       <GameBoard board={board} boardRef={boardRef} preview={preview} />
       <PieceTray
         pieces={pieces}
@@ -137,6 +186,18 @@ function App() {
         onPointerUp={handlePointerUp}
         onPointerCancel={clearDrag}
       />
+      {gameOver && (
+        <div className="game-over-overlay" role="dialog" aria-modal="true">
+          <div className="game-over-card">
+            <p className="eyebrow">BOARD COMPLETE</p>
+            <h2>GAME OVER</h2>
+            <p className="final-score">Final score: {score}</p>
+            <button type="button" onClick={restartGame}>
+              Restart
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
