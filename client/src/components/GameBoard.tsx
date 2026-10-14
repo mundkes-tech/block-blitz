@@ -10,13 +10,21 @@ export type BoardPreview = {
   valid: boolean
 }
 
+export type BoardEffect = {
+  id: number
+  placedCells: { row: number; col: number }[]
+  clearedRows: number[]
+  clearedColumns: number[]
+}
+
 type GameBoardProps = {
   board: Board
   boardRef?: RefObject<HTMLDivElement | null>
   preview?: BoardPreview | null
+  effect?: BoardEffect | null
 }
 
-function GameBoard({ board, boardRef, preview }: GameBoardProps) {
+function GameBoard({ board, boardRef, preview, effect }: GameBoardProps) {
   return (
     <div
       ref={boardRef}
@@ -29,6 +37,18 @@ function GameBoard({ board, boardRef, preview }: GameBoardProps) {
           <GridCell
             key={`${rowIndex}-${columnIndex}`}
             occupied={occupied}
+            effect={
+              effect?.clearedRows.includes(rowIndex) ||
+              effect?.clearedColumns.includes(columnIndex)
+                ? effect.clearedRows.length + effect.clearedColumns.length > 1
+                  ? 'multi-line'
+                  : 'line-clear'
+                : effect?.placedCells.some(
+                      (cell) => cell.row === rowIndex && cell.col === columnIndex,
+                    )
+                  ? 'placement'
+                  : undefined
+            }
             preview={
               preview &&
               preview.shape.cells.some(
