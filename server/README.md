@@ -29,3 +29,25 @@ every startup.
 
 Scores are accepted as foundation data only. Server-authoritative gameplay
 validation and authentication are future phases.
+
+## Authentication status
+
+Authentication is intentionally not enabled yet. The repository does not
+contain the original VELOOP Rewards task brief, an official VELOOP
+authentication document or SDK, an issuer/audience configuration, or test
+credentials. No authentication protocol is assumed.
+
+The current game-session endpoints are therefore anonymous foundation
+endpoints. The nullable `user_id` column is reserved for a verified identity
+from a future integration; clients must not treat the optional `userId` body
+field as proof of identity. User-specific reads, writes, and frontend
+authenticated states must be added only after VELOOP provides the documented
+authentication flow.
+
+To complete this phase, the missing integration should specify:
+
+- the official authentication flow and SDK or API base URL;
+- how the backend validates the returned identity;
+- trusted issuer, audience, signing-key, expiry, and token or cookie details;
+- the stable VELOOP user identifier format; and
+- the expected unauthenticated and expired-session behavior.
