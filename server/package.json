@@ -1,0 +1,8 @@
+{
+  "name": "block-blitz-server",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts"
+  }
+}
