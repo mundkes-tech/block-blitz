@@ -26,6 +26,25 @@ every startup.
   `userId` must be a UUID.
 - `PATCH /api/game-sessions/:sessionId/result` - completes an in-progress
   session with non-negative integer `score` and `linesCleared` values.
+- `GET /api/game-sessions?page=1&pageSize=20` - returns completed anonymous
+  sessions newest first. `pageSize` defaults to `20` and is limited to `100`.
+  The response includes `items` and `pagination` (`page`, `pageSize`, `total`,
+  and `totalPages`).
+- `GET /api/game-sessions/stats` - returns aggregate statistics for completed
+  anonymous sessions: `totalCompletedGames`, `highestScore`, `averageScore`,
+  `totalLinesCleared`, and `mostRecentCompletedAt`.
+
+Example requests:
+
+```text
+GET http://localhost:5000/api/game-sessions?page=1&pageSize=20
+GET http://localhost:5000/api/game-sessions/stats
+```
+
+History and statistics exclude all `in_progress` sessions. They aggregate
+across available anonymous development sessions and are not authenticated
+player-specific data. Query parameters must be positive integers; invalid
+values return `400`.
 
 Scores are accepted as foundation data only. Server-authoritative gameplay
 validation and authentication are future phases.

@@ -19,6 +19,32 @@ type CompletionResponse = {
   }
 }
 
+export type GameSessionHistoryItem = {
+  sessionId: string
+  score: number
+  linesCleared: number
+  startedAt: string
+  completedAt: string
+}
+
+export type GameSessionHistory = {
+  items: GameSessionHistoryItem[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+  }
+}
+
+export type GameSessionStats = {
+  totalCompletedGames: number
+  highestScore: number
+  averageScore: number
+  totalLinesCleared: number
+  mostRecentCompletedAt: string | null
+}
+
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
 ).replace(/\/+$/, '')
@@ -123,4 +149,81 @@ export async function completeGameSession(
   }
 
   return response.data
+}
+
+export async function fetchGameSessionHistory(
+  page = 1,
+  pageSize = 20,
+): Promise<GameSessionHistory> {
+  if (
+    !Number.isSafeInteger(page) ||
+    page < 1 ||
+    !Number.isSafeInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > 100
+  ) {
+    throw new GameSessionApiError('Invalid history pagination')
+  }
+
+  const response = await request<{
+    success: boolean
+    data?: GameSessionHistory
+  }>(`/api/game-sessions?page=${page}&pageSize=${pageSize}`, {
+    method: 'GET',
+  })
+  const data = response.data
+
+  if (
+    !response.success ||
+    !data ||
+    !Array.isArray(data.items) ||
+    !data.pagination ||
+    data.pagination.page !== page ||
+    data.pagination.pageSize !== pageSize ||
+    !Number.isSafeInteger(data.pagination.total) ||
+    data.pagination.total < 0 ||
+    !Number.isSafeInteger(data.pagination.totalPages) ||
+    data.pagination.totalPages < 0 ||
+    !data.items.every(
+      (item) =>
+        SESSION_ID_PATTERN.test(item.sessionId) &&
+        Number.isSafeInteger(item.score) &&
+        item.score >= 0 &&
+        Number.isSafeInteger(item.linesCleared) &&
+        item.linesCleared >= 0 &&
+        typeof item.startedAt === 'string' &&
+        typeof item.completedAt === 'string',
+    )
+  ) {
+    throw new GameSessionApiError('The session service returned invalid data')
+  }
+
+  return data
+}
+
+export async function fetchGameSessionStats(): Promise<GameSessionStats> {
+  const response = await request<{
+    success: boolean
+    data?: GameSessionStats
+  }>('/api/game-sessions/stats', { method: 'GET' })
+  const data = response.data
+
+  if (
+    !response.success ||
+    !data ||
+    !Number.isSafeInteger(data.totalCompletedGames) ||
+    data.totalCompletedGames < 0 ||
+    !Number.isSafeInteger(data.highestScore) ||
+    data.highestScore < 0 ||
+    !Number.isFinite(data.averageScore) ||
+    data.averageScore < 0 ||
+    !Number.isSafeInteger(data.totalLinesCleared) ||
+    data.totalLinesCleared < 0 ||
+    (data.mostRecentCompletedAt !== null &&
+      typeof data.mostRecentCompletedAt !== 'string')
+  ) {
+    throw new GameSessionApiError('The session service returned invalid data')
+  }
+
+  return data
 }
