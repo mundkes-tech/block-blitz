@@ -44,6 +44,12 @@ field as proof of identity. User-specific reads, writes, and frontend
 authenticated states must be added only after VELOOP provides the documented
 authentication flow.
 
+The frontend uses anonymous sessions for development. Starting a game attempts
+to create one session, and game over submits its score and total cleared-line
+count once. Returning Home abandons the active session without submitting a
+result; the current schema intentionally leaves that session
+`in_progress`. A failed API request never blocks local gameplay.
+
 To complete this phase, the missing integration should specify:
 
 - the official authentication flow and SDK or API base URL;

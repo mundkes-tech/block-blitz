@@ -222,6 +222,22 @@ h1 {
   font-size: 1.5rem;
 }
 
+.save-status {
+  min-height: 1rem;
+  margin: -1.2rem 0 0;
+  color: #7c8a9f;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.save-status--saved {
+  color: #78d7c2;
+}
+
+.save-status--unavailable {
+  color: #edb0a1;
+}
+
 .score-value--updated,
 .combo-value {
   animation: feedback-pop 260ms ease-out;

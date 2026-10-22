@@ -14,6 +14,11 @@ import {
   updateCombo,
 } from './game/scoring'
 import { SoundEffects } from './game/sound'
+import {
+  completeGameSession,
+  createGameSession,
+  GameSessionApiError,
+} from './services/gameSessionsApi'
 import './App.css'
 
 type ActiveDrag = {
@@ -22,6 +27,7 @@ type ActiveDrag = {
 }
 
 type GamePhase = 'home' | 'playing' | 'gameOver'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'unavailable'
 
 const BEST_SCORE_KEY = 'block-blitz-best-score'
 const SOUND_ENABLED_KEY = 'block-blitz-sound-enabled'
@@ -101,6 +107,8 @@ function App() {
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
   const [bestScore, setBestScore] = useState(readBestScore)
+  const [totalLinesCleared, setTotalLinesCleared] = useState(0)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [soundEnabled, setSoundEnabled] = useState(readSoundEnabled)
   const [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null)
   const [feedbackId, setFeedbackId] = useState(0)
@@ -109,6 +117,10 @@ function App() {
   const activeDragRef = useRef<ActiveDrag | null>(null)
   const previewRef = useRef<BoardPreview | null>(null)
   const soundEffectsRef = useRef<SoundEffects | null>(null)
+  const gameTokenRef = useRef(0)
+  const sessionIdRef = useRef<string | null>(null)
+  const sessionCompletionSubmittedRef = useRef(false)
+  const gameStatsRef = useRef({ score: 0, linesCleared: 0, ended: false })
 
   useEffect(() => {
     try {
@@ -145,6 +157,55 @@ function App() {
 
     soundEffectsRef.current ??= new SoundEffects()
     soundEffectsRef.current.play(effect)
+  }
+
+  const submitSessionResult = (token: number) => {
+    const sessionId = sessionIdRef.current
+    const stats = gameStatsRef.current
+
+    if (
+      token !== gameTokenRef.current ||
+      !sessionId ||
+      !stats.ended ||
+      sessionCompletionSubmittedRef.current
+    ) {
+      return
+    }
+
+    sessionCompletionSubmittedRef.current = true
+    setSaveStatus('saving')
+    void completeGameSession(sessionId, stats.score, stats.linesCleared)
+      .then(() => {
+        if (token === gameTokenRef.current) {
+          setSaveStatus('saved')
+        }
+      })
+      .catch((error: unknown) => {
+        if (token === gameTokenRef.current) {
+          setSaveStatus(
+            error instanceof GameSessionApiError ? 'unavailable' : 'unavailable',
+          )
+        }
+      })
+  }
+
+  const createSessionForGame = (token: number) => {
+    setSaveStatus('saving')
+    void createGameSession()
+      .then((sessionId) => {
+        if (token !== gameTokenRef.current) {
+          return
+        }
+
+        sessionIdRef.current = sessionId
+        setSaveStatus(gameStatsRef.current.ended ? 'saving' : 'saved')
+        submitSessionResult(token)
+      })
+      .catch(() => {
+        if (token === gameTokenRef.current) {
+          setSaveStatus('unavailable')
+        }
+      })
   }
 
   const updatePreview = (
@@ -265,6 +326,12 @@ function App() {
       setScore(nextScore)
       setBestScore((currentBest) => Math.max(currentBest, nextScore))
       setCombo(nextCombo)
+      setTotalLinesCleared((currentLines) => currentLines + clearedLineCount)
+      gameStatsRef.current = {
+        score: nextScore,
+        linesCleared: gameStatsRef.current.linesCleared + clearedLineCount,
+        ended: false,
+      }
       setFeedbackId((currentId) => currentId + 1)
       setBoardEffect({
         id: Date.now(),
@@ -283,8 +350,10 @@ function App() {
         playSound('combo')
       }
       if (didGameEnd) {
+        gameStatsRef.current.ended = true
         setPhase('gameOver')
         playSound('gameOver')
+        submitSessionResult(gameTokenRef.current)
       }
     }
 
@@ -293,13 +362,20 @@ function App() {
 
   const startNewGame = () => {
     clearDrag()
+    gameTokenRef.current += 1
+    sessionIdRef.current = null
+    sessionCompletionSubmittedRef.current = false
+    gameStatsRef.current = { score: 0, linesCleared: 0, ended: false }
     setBoard(createEmptyBoard())
     setPieces(generatePieces())
     setScore(0)
     setCombo(0)
+    setTotalLinesCleared(0)
     setBoardEffect(null)
     setFeedbackId((currentId) => currentId + 1)
+    setSaveStatus('saving')
     setPhase('playing')
+    createSessionForGame(gameTokenRef.current)
   }
 
   const returnHome = () => {
@@ -342,7 +418,18 @@ function App() {
             </strong>
           </div>
         )}
+        <div>
+          <span className="score-label">LINES</span>
+          <strong>{totalLinesCleared}</strong>
+        </div>
       </section>
+      {saveStatus !== 'idle' && (
+        <p className={`save-status save-status--${saveStatus}`} aria-live="polite">
+          {saveStatus === 'saving' && 'Saving game…'}
+          {saveStatus === 'saved' && 'Game session connected'}
+          {saveStatus === 'unavailable' && 'Offline save unavailable'}
+        </p>
+      )}
       <div className="game-controls">
         <button
           className="sound-toggle"
