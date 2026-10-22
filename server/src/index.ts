@@ -10,6 +10,7 @@ import { loadConfig } from './config.js'
 import { checkDatabase, createDatabasePool } from './db/pool.js'
 import { initializeDatabase } from './db/migrations.js'
 import { ApiError } from './errors.js'
+import { leaderboardController } from './controllers/gameSessions.js'
 import { createGameSessionRouter } from './routes/gameSessions.js'
 
 const config = loadConfig()
@@ -39,6 +40,7 @@ export function createApp() {
   })
 
   app.use('/api/game-sessions', createGameSessionRouter(databasePool))
+  app.get('/api/leaderboard', leaderboardController(databasePool))
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     if (error instanceof SyntaxError && 'body' in error) {

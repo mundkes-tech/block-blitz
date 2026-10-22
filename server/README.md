@@ -33,18 +33,29 @@ every startup.
 - `GET /api/game-sessions/stats` - returns aggregate statistics for completed
   anonymous sessions: `totalCompletedGames`, `highestScore`, `averageScore`,
   `totalLinesCleared`, and `mostRecentCompletedAt`.
+- `GET /api/leaderboard?page=1&pageSize=20` - returns ranked completed
+  anonymous sessions. Each item contains `rank`, `score`, `linesCleared`, and
+  `completedAt`; session IDs and user IDs are not exposed.
 
 Example requests:
 
 ```text
 GET http://localhost:5000/api/game-sessions?page=1&pageSize=20
 GET http://localhost:5000/api/game-sessions/stats
+GET http://localhost:5000/api/leaderboard?page=1&pageSize=20
 ```
 
 History and statistics exclude all `in_progress` sessions. They aggregate
 across available anonymous development sessions and are not authenticated
 player-specific data. Query parameters must be positive integers; invalid
 values return `400`.
+
+Leaderboard entries are sorted by score descending, then completion timestamp
+descending, then session ID descending as a deterministic tie-breaker. It uses
+the same pagination metadata and limits as history: page defaults to `1`,
+`pageSize` defaults to `20`, and `pageSize` cannot exceed `100`. Repeated
+sessions from the same person may appear as separate anonymous entries, and
+the endpoint is not a verified per-player leaderboard.
 
 Scores are accepted as foundation data only. Server-authoritative gameplay
 validation and authentication are future phases.

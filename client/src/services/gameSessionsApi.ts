@@ -45,6 +45,18 @@ export type GameSessionStats = {
   mostRecentCompletedAt: string | null
 }
 
+export type LeaderboardEntry = {
+  rank: number
+  score: number
+  linesCleared: number
+  completedAt: string
+}
+
+export type LeaderboardResponse = {
+  items: LeaderboardEntry[]
+  pagination: GameSessionHistory['pagination']
+}
+
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
 ).replace(/\/+$/, '')
@@ -221,6 +233,56 @@ export async function fetchGameSessionStats(): Promise<GameSessionStats> {
     data.totalLinesCleared < 0 ||
     (data.mostRecentCompletedAt !== null &&
       typeof data.mostRecentCompletedAt !== 'string')
+  ) {
+    throw new GameSessionApiError('The session service returned invalid data')
+  }
+
+  return data
+}
+
+export async function fetchLeaderboard(
+  page = 1,
+  pageSize = 20,
+): Promise<LeaderboardResponse> {
+  if (
+    !Number.isSafeInteger(page) ||
+    page < 1 ||
+    !Number.isSafeInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > 100
+  ) {
+    throw new GameSessionApiError('Invalid leaderboard pagination')
+  }
+
+  const response = await request<{
+    success: boolean
+    data?: LeaderboardResponse
+  }>(`/api/leaderboard?page=${page}&pageSize=${pageSize}`, {
+    method: 'GET',
+  })
+  const data = response.data
+
+  if (
+    !response.success ||
+    !data ||
+    !Array.isArray(data.items) ||
+    !data.pagination ||
+    data.pagination.page !== page ||
+    data.pagination.pageSize !== pageSize ||
+    !Number.isSafeInteger(data.pagination.total) ||
+    data.pagination.total < 0 ||
+    !Number.isSafeInteger(data.pagination.totalPages) ||
+    data.pagination.totalPages < 0 ||
+    !data.items.every(
+      (entry) =>
+        Number.isSafeInteger(entry.rank) &&
+        entry.rank > 0 &&
+        Number.isSafeInteger(entry.score) &&
+        entry.score >= 0 &&
+        Number.isSafeInteger(entry.linesCleared) &&
+        entry.linesCleared >= 0 &&
+        typeof entry.completedAt === 'string',
+    )
   ) {
     throw new GameSessionApiError('The session service returned invalid data')
   }

@@ -4,6 +4,7 @@ import {
   completeGameSession,
   createGameSession,
   getGameSessionStats,
+  listLeaderboard,
   listCompletedGameSessions,
 } from '../services/gameSessions.js'
 
@@ -48,6 +49,34 @@ export function statsController(pool: Pool | null) {
         averageScore: stats.averageScore,
         totalLinesCleared: stats.totalLinesCleared,
         mostRecentCompletedAt: stats.mostRecentCompletedAt,
+      },
+    })
+  }
+}
+
+export function leaderboardController(pool: Pool | null) {
+  return async (req: Request, res: Response): Promise<void> => {
+    const result = await listLeaderboard(
+      pool,
+      req.query.page,
+      req.query.pageSize,
+    )
+
+    res.json({
+      success: true,
+      data: {
+        items: result.items.map((entry) => ({
+          rank: entry.rank,
+          score: entry.score,
+          linesCleared: entry.linesCleared,
+          completedAt: entry.completedAt,
+        })),
+        pagination: {
+          page: result.page,
+          pageSize: result.pageSize,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
       },
     })
   }

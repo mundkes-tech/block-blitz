@@ -30,6 +30,13 @@ export type GameSessionStats = {
   mostRecentCompletedAt: Date | null
 }
 
+export type LeaderboardEntry = {
+  rank: number
+  score: number
+  linesCleared: number
+  completedAt: Date
+}
+
 const DEFAULT_PAGE = 1
 const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 100
@@ -139,6 +146,65 @@ export async function listCompletedGameSessions(
       score: row.score,
       linesCleared: row.lines_cleared,
       startedAt: row.started_at,
+      completedAt: row.completed_at,
+    })),
+    page,
+    pageSize,
+    total,
+    totalPages: total === 0 ? 0 : Math.ceil(total / pageSize),
+  }
+}
+
+export async function listLeaderboard(
+  pool: Pool | null,
+  pageValue: unknown,
+  pageSizeValue: unknown,
+): Promise<{
+  items: LeaderboardEntry[]
+  page: number
+  pageSize: number
+  total: number
+  totalPages: number
+}> {
+  const page = parsePageValue(pageValue, 'page', DEFAULT_PAGE)
+  const pageSize = parsePageValue(pageSizeValue, 'pageSize', DEFAULT_PAGE_SIZE)
+
+  if (pageSize > MAX_PAGE_SIZE) {
+    throw new ApiError(400, `pageSize must be at most ${MAX_PAGE_SIZE}`)
+  }
+
+  const database = requirePool(pool)
+  const offset = (page - 1) * pageSize
+  if (!Number.isSafeInteger(offset)) {
+    throw new ApiError(400, 'page is too large')
+  }
+
+  const [entriesResult, countResult] = await Promise.all([
+    database.query<{
+      score: number
+      lines_cleared: number
+      completed_at: Date
+    }>(
+      `SELECT score, lines_cleared, completed_at
+       FROM game_sessions
+       WHERE status = 'completed' AND completed_at IS NOT NULL
+       ORDER BY score DESC, completed_at DESC, session_id DESC
+       LIMIT $1 OFFSET $2`,
+      [pageSize, offset],
+    ),
+    database.query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total
+       FROM game_sessions
+       WHERE status = 'completed' AND completed_at IS NOT NULL`,
+    ),
+  ])
+  const total = safeAggregateValue(countResult.rows[0]?.total)
+
+  return {
+    items: entriesResult.rows.map((row, index) => ({
+      rank: offset + index + 1,
+      score: row.score,
+      linesCleared: row.lines_cleared,
       completedAt: row.completed_at,
     })),
     page,
