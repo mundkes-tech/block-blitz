@@ -16,4 +16,5 @@ function GridCell({ occupied, preview, effect }: GridCellProps) {
   )
 }
 
-export default GridCell
+export default memo(GridCell)
+import { memo } from 'react'

@@ -41,6 +41,7 @@ function PieceTray({
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerCancel}
+              onLostPointerCapture={onPointerCancel}
             >
               <div className="piece-grid" style={gridStyle}>
                 {piece.shape.cells.map(({ row, col }) => (

@@ -1,18 +1,21 @@
 .game-shell {
   width: min(100%, 560px);
+  min-height: 100svh;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2rem;
-  padding: 3rem 1rem;
+  padding: max(2rem, env(safe-area-inset-top)) 1rem
+    max(2rem, env(safe-area-inset-bottom));
 }
 
 .home-screen {
   display: grid;
   min-height: 100vh;
   place-items: center;
-  padding: 2rem 1rem;
+  padding: max(2rem, env(safe-area-inset-top)) 1rem
+    max(2rem, env(safe-area-inset-bottom));
 }
 
 .home-card {
@@ -288,6 +291,7 @@ h1 {
   box-shadow:
     0 1.5rem 3rem rgb(0 0 0 / 25%),
     inset 0 1px rgb(255 255 255 / 4%);
+  touch-action: none;
 }
 
 .grid-cell {
@@ -502,5 +506,49 @@ h1 {
   .piece-preview {
     min-height: 4.5rem;
     padding: 0.5rem;
+  }
+
+  .game-shell {
+    gap: 1.25rem;
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+  }
+
+  .score-panel {
+    gap: clamp(1rem, 8vw, 2rem);
+  }
+
+  .score-panel strong {
+    font-size: 1.3rem;
+  }
+
+  .piece-list {
+    gap: 0.4rem;
+  }
+
+  .piece-preview {
+    min-height: 4.25rem;
+  }
+
+  .game-over-overlay {
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .game-shell {
+    gap: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .game-header .subtitle,
+  .game-header .text-button {
+    margin-top: 0.35rem;
+  }
+
+  .game-board {
+    width: min(100%, 68svh, 500px);
   }
 }

@@ -150,6 +150,8 @@ function App() {
     return () => window.clearTimeout(timeoutId)
   }, [boardEffect])
 
+  useEffect(() => () => soundEffectsRef.current?.dispose(), [])
+
   const playSound = (effect: Parameters<SoundEffects['play']>[0]) => {
     if (!soundEnabled) {
       return

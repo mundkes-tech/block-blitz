@@ -44,5 +44,12 @@ export class SoundEffects {
     } catch {
       // Audio is an enhancement; gameplay remains available if it fails.
     }
+
+  }
+
+  dispose(): void {
+    const context = this.context
+    this.context = null
+    void context?.close()
   }
 }
