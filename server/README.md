@@ -9,7 +9,9 @@ database. `PORT` and `CLIENT_URL` default to `5000` and
 The server starts without a database connection so the existing API health
 endpoint remains available. Database routes return `503` until
 `DATABASE_URL` is configured and reachable. Database credentials are never
-returned in API responses or logs.
+returned in API responses or logs. JSON request bodies are limited to 32 KiB;
+malformed bodies receive a safe `400` response and oversized bodies receive a
+safe `413` response.
 
 ## Database initialization
 

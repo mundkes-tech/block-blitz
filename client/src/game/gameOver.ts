@@ -7,7 +7,7 @@ export function canAnyPieceFit(board: Board, pieces: Piece[]): boolean {
     Array.from({ length: BOARD_SIZE }, (_, row) =>
       Array.from({ length: BOARD_SIZE }, (_, col) =>
         canPlaceShape(board, piece.shape, row, col),
-      ),
+      ).some(Boolean),
     ).some(Boolean),
   )
 }
