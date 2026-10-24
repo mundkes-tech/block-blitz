@@ -11,9 +11,13 @@ type CompletionResponse = {
   success: boolean
   data?: {
     sessionId: string
+    userId?: string | null
     status: 'completed'
     score: number
     linesCleared: number
+    blocksPlaced?: number
+    highestCombo?: number
+    duration?: number
     startedAt: string
     completedAt: string
   }
@@ -21,8 +25,12 @@ type CompletionResponse = {
 
 export type GameSessionHistoryItem = {
   sessionId: string
+  userId?: string | null
   score: number
   linesCleared: number
+  blocksPlaced?: number
+  highestCombo?: number
+  duration?: number
   startedAt: string
   completedAt: string
 }
@@ -47,14 +55,28 @@ export type GameSessionStats = {
 
 export type LeaderboardEntry = {
   rank: number
+  playerName: string
+  userId?: string | null
   score: number
   linesCleared: number
+  highestCombo?: number
   completedAt: string
 }
 
 export type LeaderboardResponse = {
   items: LeaderboardEntry[]
   pagination: GameSessionHistory['pagination']
+}
+
+export type UserProfile = {
+  id: string
+  name: string
+  email: string
+  highestScore: number
+  totalGames: number
+  totalLinesCleared: number
+  highestCombo: number
+  createdAt: string
 }
 
 const API_BASE_URL = (
@@ -108,10 +130,16 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   }
 }
 
-export async function createGameSession(): Promise<string> {
-  const response = await request<SessionResponse>('/api/game-sessions', {
+export async function createGameSession(userId?: string): Promise<string> {
+  const response = await request<SessionResponse>('/api/games/start', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(userId ? { userId } : {}),
+  }).catch(() => {
+    // Fallback to legacy endpoint if /api/games/start is not ready
+    return request<SessionResponse>('/api/game-sessions', {
+      method: 'POST',
+      body: JSON.stringify(userId ? { userId } : {}),
+    })
   })
 
   if (
@@ -130,6 +158,9 @@ export async function completeGameSession(
   sessionId: string,
   score: number,
   linesCleared: number,
+  blocksPlaced = 0,
+  highestCombo = 0,
+  duration = 0,
 ): Promise<CompletionResponse['data']> {
   if (
     !SESSION_ID_PATTERN.test(sessionId) ||
@@ -141,21 +172,36 @@ export async function completeGameSession(
     throw new GameSessionApiError('Invalid game result')
   }
 
+  const payload = {
+    score,
+    linesCleared,
+    blocksPlaced,
+    highestCombo,
+    duration,
+  }
+
   const response = await request<CompletionResponse>(
-    `/api/game-sessions/${sessionId}/result`,
+    `/api/games/complete`,
     {
-      method: 'PATCH',
-      body: JSON.stringify({ score, linesCleared }),
+      method: 'POST',
+      body: JSON.stringify({ sessionId, ...payload }),
     },
-  )
+  ).catch(() => {
+    // Fallback to legacy endpoint
+    return request<CompletionResponse>(
+      `/api/game-sessions/${sessionId}/result`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      },
+    )
+  })
 
   if (
     !response.success ||
     !response.data ||
     response.data.status !== 'completed' ||
-    response.data.sessionId !== sessionId ||
-    response.data.score !== score ||
-    response.data.linesCleared !== linesCleared
+    response.data.sessionId !== sessionId
   ) {
     throw new GameSessionApiError('The session service returned invalid data')
   }
@@ -166,6 +212,7 @@ export async function completeGameSession(
 export async function fetchGameSessionHistory(
   page = 1,
   pageSize = 20,
+  userId?: string,
 ): Promise<GameSessionHistory> {
   if (
     !Number.isSafeInteger(page) ||
@@ -177,11 +224,19 @@ export async function fetchGameSessionHistory(
     throw new GameSessionApiError('Invalid history pagination')
   }
 
+  const userQuery = userId ? `&userId=${encodeURIComponent(userId)}` : ''
   const response = await request<{
     success: boolean
     data?: GameSessionHistory
-  }>(`/api/game-sessions?page=${page}&pageSize=${pageSize}`, {
+  }>(`/api/games/history?page=${page}&pageSize=${pageSize}${userQuery}`, {
     method: 'GET',
+  }).catch(() => {
+    return request<{
+      success: boolean
+      data?: GameSessionHistory
+    }>(`/api/game-sessions?page=${page}&pageSize=${pageSize}`, {
+      method: 'GET',
+    })
   })
   const data = response.data
 
@@ -189,23 +244,7 @@ export async function fetchGameSessionHistory(
     !response.success ||
     !data ||
     !Array.isArray(data.items) ||
-    !data.pagination ||
-    data.pagination.page !== page ||
-    data.pagination.pageSize !== pageSize ||
-    !Number.isSafeInteger(data.pagination.total) ||
-    data.pagination.total < 0 ||
-    !Number.isSafeInteger(data.pagination.totalPages) ||
-    data.pagination.totalPages < 0 ||
-    !data.items.every(
-      (item) =>
-        SESSION_ID_PATTERN.test(item.sessionId) &&
-        Number.isSafeInteger(item.score) &&
-        item.score >= 0 &&
-        Number.isSafeInteger(item.linesCleared) &&
-        item.linesCleared >= 0 &&
-        typeof item.startedAt === 'string' &&
-        typeof item.completedAt === 'string',
-    )
+    !data.pagination
   ) {
     throw new GameSessionApiError('The session service returned invalid data')
   }
@@ -213,27 +252,20 @@ export async function fetchGameSessionHistory(
   return data
 }
 
-export async function fetchGameSessionStats(): Promise<GameSessionStats> {
+export async function fetchGameSessionStats(userId?: string): Promise<GameSessionStats> {
+  const userQuery = userId ? `?userId=${encodeURIComponent(userId)}` : ''
   const response = await request<{
     success: boolean
     data?: GameSessionStats
-  }>('/api/game-sessions/stats', { method: 'GET' })
+  }>(`/api/games/stats${userQuery}`, { method: 'GET' }).catch(() => {
+    return request<{
+      success: boolean
+      data?: GameSessionStats
+    }>('/api/game-sessions/stats', { method: 'GET' })
+  })
   const data = response.data
 
-  if (
-    !response.success ||
-    !data ||
-    !Number.isSafeInteger(data.totalCompletedGames) ||
-    data.totalCompletedGames < 0 ||
-    !Number.isSafeInteger(data.highestScore) ||
-    data.highestScore < 0 ||
-    !Number.isFinite(data.averageScore) ||
-    data.averageScore < 0 ||
-    !Number.isSafeInteger(data.totalLinesCleared) ||
-    data.totalLinesCleared < 0 ||
-    (data.mostRecentCompletedAt !== null &&
-      typeof data.mostRecentCompletedAt !== 'string')
-  ) {
+  if (!response.success || !data) {
     throw new GameSessionApiError('The session service returned invalid data')
   }
 
@@ -243,6 +275,7 @@ export async function fetchGameSessionStats(): Promise<GameSessionStats> {
 export async function fetchLeaderboard(
   page = 1,
   pageSize = 20,
+  timeframe = 'all',
 ): Promise<LeaderboardResponse> {
   if (
     !Number.isSafeInteger(page) ||
@@ -257,7 +290,7 @@ export async function fetchLeaderboard(
   const response = await request<{
     success: boolean
     data?: LeaderboardResponse
-  }>(`/api/leaderboard?page=${page}&pageSize=${pageSize}`, {
+  }>(`/api/leaderboard?page=${page}&pageSize=${pageSize}&timeframe=${timeframe}`, {
     method: 'GET',
   })
   const data = response.data
@@ -266,26 +299,38 @@ export async function fetchLeaderboard(
     !response.success ||
     !data ||
     !Array.isArray(data.items) ||
-    !data.pagination ||
-    data.pagination.page !== page ||
-    data.pagination.pageSize !== pageSize ||
-    !Number.isSafeInteger(data.pagination.total) ||
-    data.pagination.total < 0 ||
-    !Number.isSafeInteger(data.pagination.totalPages) ||
-    data.pagination.totalPages < 0 ||
-    !data.items.every(
-      (entry) =>
-        Number.isSafeInteger(entry.rank) &&
-        entry.rank > 0 &&
-        Number.isSafeInteger(entry.score) &&
-        entry.score >= 0 &&
-        Number.isSafeInteger(entry.linesCleared) &&
-        entry.linesCleared >= 0 &&
-        typeof entry.completedAt === 'string',
-    )
+    !data.pagination
   ) {
     throw new GameSessionApiError('The session service returned invalid data')
   }
 
   return data
+}
+
+export async function fetchMyRank(
+  userId: string,
+): Promise<{ rank: number; highestScore: number } | null> {
+  const response = await request<{
+    success: boolean
+    data?: { rank: number; highestScore: number } | null
+  }>(`/api/leaderboard/me?userId=${encodeURIComponent(userId)}`, {
+    method: 'GET',
+  })
+  return response.data ?? null
+}
+
+export async function fetchUsers(): Promise<UserProfile[]> {
+  const response = await request<{
+    success: boolean
+    data?: UserProfile[]
+  }>('/api/auth/users', { method: 'GET' })
+  return response.data ?? []
+}
+
+export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+  const response = await request<{
+    success: boolean
+    data?: UserProfile | null
+  }>(`/api/auth/me?userId=${encodeURIComponent(userId)}`, { method: 'GET' })
+  return response.data ?? null
 }

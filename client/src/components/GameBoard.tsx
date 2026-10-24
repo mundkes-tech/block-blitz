@@ -19,12 +19,25 @@ export type BoardEffect = {
 
 type GameBoardProps = {
   board: Board
+  boardColors?: (string | null)[][]
   boardRef?: RefObject<HTMLDivElement | null>
   preview?: BoardPreview | null
   effect?: BoardEffect | null
+  shake?: boolean
+  hammerActive?: boolean
+  onCellClick?: (row: number, col: number) => void
 }
 
-function GameBoard({ board, boardRef, preview, effect }: GameBoardProps) {
+function GameBoard({
+  board,
+  boardColors,
+  boardRef,
+  preview,
+  effect,
+  shake,
+  hammerActive,
+  onCellClick,
+}: GameBoardProps) {
   const previewCells = useMemo(
     () =>
       new Set(
@@ -56,6 +69,7 @@ function GameBoard({ board, boardRef, preview, effect }: GameBoardProps) {
     }
     return cells
   }, [board, effect])
+
   const clearEffect =
     effect && effect.clearedRows.length + effect.clearedColumns.length > 1
       ? 'multi-line'
@@ -64,7 +78,7 @@ function GameBoard({ board, boardRef, preview, effect }: GameBoardProps) {
   return (
     <div
       ref={boardRef}
-      className="game-board"
+      className={`game-board${shake ? ' game-board--shake' : ''}${hammerActive ? ' game-board--hammer' : ''}`}
       role="grid"
       aria-label="8 by 8 game board"
     >
@@ -73,6 +87,7 @@ function GameBoard({ board, boardRef, preview, effect }: GameBoardProps) {
           <GridCell
             key={`${rowIndex}-${columnIndex}`}
             occupied={occupied}
+            color={boardColors?.[rowIndex]?.[columnIndex]}
             effect={
               clearedCells.has(`${rowIndex}:${columnIndex}`)
                 ? clearEffect
@@ -87,6 +102,13 @@ function GameBoard({ board, boardRef, preview, effect }: GameBoardProps) {
                   : 'invalid'
                 : undefined
             }
+            previewColor={preview?.shape.color}
+            isHammerTarget={hammerActive && occupied}
+            onClick={() => {
+              if (hammerActive && occupied && onCellClick) {
+                onCellClick(rowIndex, columnIndex)
+              }
+            }}
           />
         )),
       )}

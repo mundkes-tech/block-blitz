@@ -9,8 +9,13 @@ import type { Pool } from 'pg'
 import { loadConfig, type AppConfig } from './config.js'
 import { checkDatabase, createDatabasePool } from './db/pool.js'
 import { ApiError } from './errors.js'
-import { leaderboardController } from './controllers/gameSessions.js'
+import {
+  leaderboardController,
+  myRankController,
+} from './controllers/gameSessions.js'
 import { createGameSessionRouter } from './routes/gameSessions.js'
+import { createGamesRouter } from './routes/games.js'
+import { createAuthRouter } from './routes/auth.js'
 
 export function createApp(
   config: AppConfig = loadConfig(),
@@ -39,7 +44,11 @@ export function createApp(
   })
 
   app.use('/api/game-sessions', createGameSessionRouter(databasePool))
+  app.use('/api/games', createGamesRouter(databasePool))
+  app.use('/api/auth', createAuthRouter(databasePool))
+  app.get('/api/leaderboard/me', myRankController(databasePool))
   app.get('/api/leaderboard', leaderboardController(databasePool))
+  app.get('/api/games/leaderboard', leaderboardController(databasePool))
 
   const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     if (

@@ -1,6 +1,9 @@
+import path from 'path'
 import dotenv from 'dotenv'
 
 dotenv.config()
+dotenv.config({ path: path.resolve(process.cwd(), 'server/.env') })
+
 
 function readPort(value: string | undefined): number {
   const port = Number(value ?? 5000)
