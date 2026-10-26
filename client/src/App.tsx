@@ -57,6 +57,7 @@ type BoardSnapshot = {
   combo: number
   linesCleared: number
   blocksPlaced: number
+  highestCombo: number
 }
 
 const BEST_SCORE_KEY = 'block-blitz-best-score'
@@ -588,6 +589,7 @@ function App() {
         combo,
         linesCleared: totalLinesCleared,
         blocksPlaced,
+        highestCombo,
       },
     ])
 
@@ -602,6 +604,13 @@ function App() {
     setBoardColors(nextBoardColors)
     setHammersLeft((prev) => prev - 1)
     setHammerActive(false)
+    gameStatsRef.current = {
+      ...gameStatsRef.current,
+      score,
+      linesCleared: totalLinesCleared,
+      blocksPlaced,
+      highestCombo,
+    }
     playSound('lineClear')
 
     // Trigger particle blast on smashed cell
@@ -630,6 +639,14 @@ function App() {
     setCombo(lastSnapshot.combo)
     setTotalLinesCleared(lastSnapshot.linesCleared)
     setBlocksPlaced(lastSnapshot.blocksPlaced)
+    setHighestCombo(lastSnapshot.highestCombo)
+    gameStatsRef.current = {
+      ...gameStatsRef.current,
+      score: lastSnapshot.score,
+      linesCleared: lastSnapshot.linesCleared,
+      blocksPlaced: lastSnapshot.blocksPlaced,
+      highestCombo: lastSnapshot.highestCombo,
+    }
     setUndosLeft((prev) => prev - 1)
     playSound('buttonClick')
     addMatchLog('↩️ Move Undone', 'Reverted previous state', '#a855f7')
@@ -734,6 +751,7 @@ function App() {
           combo,
           linesCleared: totalLinesCleared,
           blocksPlaced,
+          highestCombo,
         },
       ])
 
@@ -1108,8 +1126,15 @@ function App() {
           <main className="game-shell">
             {/* Header & Score Bar */}
             <header className="game-hud">
-              <div className="hud-card hud-score">
-                <span className="hud-label">⭐ SCORE</span>
+              <div className={`hud-card hud-score${combo > 1 ? ' hud-score--combo' : ''}`}>
+                <div className="hud-label-group">
+                  <span className="hud-label">⭐ SCORE</span>
+                  {combo > 1 && (
+                    <span className="hud-combo-badge pulse-combo" title={`Combo ${combo}x active`}>
+                      🔥 {combo}×
+                    </span>
+                  )}
+                </div>
                 <strong className="hud-value hud-value--score">{score.toLocaleString()}</strong>
               </div>
 
@@ -1122,20 +1147,22 @@ function App() {
                 <span className="hud-label">⚡ LINES</span>
                 <strong className="hud-value text-teal">{totalLinesCleared}</strong>
               </div>
-
-              {combo > 1 && (
-                <div className="hud-card hud-combo pulse-combo">
-                  <span className="hud-label">🔥 COMBO</span>
-                  <strong className="hud-value text-amber">{combo}x</strong>
-                </div>
-              )}
             </header>
 
             {/* Hammer active mode banner */}
             {hammerActive && (
-              <div className="hammer-active-banner">
-                <span>🔨 HAMMER MODE ACTIVE</span>
-                <p>Click any occupied block on the board to smash it!</p>
+              <div className="hammer-active-banner" role="status">
+                <span className="hammer-banner-icon">🔨</span>
+                <span className="hammer-banner-text">HAMMER ACTIVE: Tap a block to smash!</span>
+                <button
+                  type="button"
+                  className="hammer-banner-cancel-btn"
+                  onClick={() => setHammerActive(false)}
+                  title="Cancel Hammer"
+                  aria-label="Cancel Hammer Mode"
+                >
+                  ✕
+                </button>
               </div>
             )}
 
