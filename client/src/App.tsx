@@ -1189,8 +1189,8 @@ function App() {
               </button>
             </div>
 
-            {/* Return Home Button */}
-            <div className="game-bottom-actions">
+            {/* Return Home Button (Desktop: inside center column) */}
+            <div className="game-bottom-actions desktop-only-actions">
               <button className="text-pill-btn" type="button" onClick={returnHome}>
                 ← Back to Home
               </button>
@@ -1206,6 +1206,13 @@ function App() {
             onPointerUp={handlePointerUp}
             onPointerCancel={clearDrag}
           />
+
+          {/* Return Home Button (Mobile: below piece dock) */}
+          <div className="game-bottom-actions mobile-only-actions">
+            <button className="text-pill-btn" type="button" onClick={returnHome}>
+              ← Back to Home
+            </button>
+          </div>
         </div>
       )}
 

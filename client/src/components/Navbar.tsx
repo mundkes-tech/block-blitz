@@ -65,7 +65,7 @@ export function Navbar({
           onClick={onOpenLeaderboard}
           title="Global Leaderboard"
         >
-          🏆 <span className="nav-btn-text">Leaderboard</span>
+          🏆 <span className="nav-btn-text">Rank</span>
         </button>
         <button
           className="nav-action-btn"
@@ -73,7 +73,7 @@ export function Navbar({
           onClick={onOpenDashboard}
           title="Player Dashboard & History"
         >
-          📊 <span className="nav-btn-text">Dashboard</span>
+          📊 <span className="nav-btn-text">Stats</span>
         </button>
         <button
           className="nav-action-btn"
@@ -81,7 +81,7 @@ export function Navbar({
           onClick={onOpenChallenge}
           title="Daily Challenge"
         >
-          🎯 <span className="nav-btn-text">Challenge</span>
+          🎯 <span className="nav-btn-text">Mission</span>
         </button>
         <button
           className="nav-action-btn"
