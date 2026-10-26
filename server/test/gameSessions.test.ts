@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createServer, type Server } from 'node:http'
 import test from 'node:test'
-import type { Pool, QueryResult } from 'pg'
+import type { Pool, QueryResult, QueryResultRow } from 'pg'
 import { createApp } from '../src/app.js'
 import type { AppConfig } from '../src/config.js'
 import { ApiError } from '../src/errors.js'
@@ -20,6 +20,19 @@ type QueryHandler = (
 
 function createPool(handler: QueryHandler): Pool {
   return { query: handler } as unknown as Pool
+}
+
+function createMockQueryResult<T extends QueryResultRow = any>(
+  rows: T[],
+  rowCount?: number,
+): QueryResult<T> {
+  return {
+    rows,
+    command: 'SELECT',
+    rowCount: rowCount ?? rows.length,
+    oid: 0,
+    fields: [],
+  }
 }
 
 const validSessionId = '123e4567-e89b-12d3-a456-426614174000'
@@ -81,18 +94,16 @@ test('completes an in-progress session with parameterized values', async () => {
   const queries: Array<{ text: string; values?: readonly unknown[] }> = []
   const pool = createPool(async (text, values) => {
     queries.push({ text, values })
-    return {
-      rows: [
-        {
-          session_id: validSessionId,
-          status: 'completed',
-          started_at: new Date('2026-01-01T00:00:00Z'),
-          completed_at: new Date('2026-01-01T00:01:00Z'),
-          score: 120,
-          lines_cleared: 1,
-        },
-      ],
-    } as QueryResult
+    return createMockQueryResult([
+      {
+        session_id: validSessionId,
+        status: 'completed',
+        started_at: new Date('2026-01-01T00:00:00Z'),
+        completed_at: new Date('2026-01-01T00:01:00Z'),
+        score: 120,
+        lines_cleared: 1,
+      },
+    ])
   })
 
   const result = await completeGameSession(pool, validSessionId, 120, 1)
@@ -104,12 +115,12 @@ test('completes an in-progress session with parameterized values', async () => {
 
 test('returns not found and conflict for unknown and completed sessions', async () => {
   const unknownPool = createPool(async (text) => {
-    if (text.startsWith('UPDATE')) return { rows: [] } as QueryResult
-    return { rows: [] } as QueryResult
+    if (text.startsWith('UPDATE')) return createMockQueryResult([])
+    return createMockQueryResult([])
   })
   const completedPool = createPool(async (text) => {
-    if (text.startsWith('UPDATE')) return { rows: [] } as QueryResult
-    return { rows: [{ status: 'completed' }] } as QueryResult
+    if (text.startsWith('UPDATE')) return createMockQueryResult([])
+    return createMockQueryResult([{ status: 'completed' }])
   })
 
   await assert.rejects(
@@ -128,20 +139,18 @@ test('uses completed-only parameterized pagination for history and leaderboard',
     calls.push({ text, values })
 
     if (text.includes('COUNT(*)')) {
-      return { rows: [{ total: '3' }] } as QueryResult
+      return createMockQueryResult([{ total: '3' }])
     }
 
-    return {
-      rows: [
-        {
-          session_id: validSessionId,
-          score: 500,
-          lines_cleared: 4,
-          started_at: new Date('2026-01-01T00:00:00Z'),
-          completed_at: new Date('2026-01-01T00:01:00Z'),
-        },
-      ],
-    } as QueryResult
+    return createMockQueryResult([
+      {
+        session_id: validSessionId,
+        score: 500,
+        lines_cleared: 4,
+        started_at: new Date('2026-01-01T00:00:00Z'),
+        completed_at: new Date('2026-01-01T00:01:00Z'),
+      },
+    ])
   })
 
   const history = await listCompletedGameSessions(pool, '2', '1')
@@ -156,8 +165,8 @@ test('uses completed-only parameterized pagination for history and leaderboard',
 })
 
 test('returns zero-safe aggregate statistics for an empty result', async () => {
-  const pool = createPool(async () => ({
-    rows: [
+  const pool = createPool(async () =>
+    createMockQueryResult([
       {
         total_completed_games: '0',
         highest_score: '0',
@@ -165,8 +174,8 @@ test('returns zero-safe aggregate statistics for an empty result', async () => {
         total_lines_cleared: '0',
         most_recent_completed_at: null,
       },
-    ],
-  }) as QueryResult)
+    ]),
+  )
 
   assert.deepEqual(await getGameSessionStats(pool), {
     totalCompletedGames: 0,
@@ -241,9 +250,9 @@ test('getUserGameHistory supports both global and user-specific history queries'
   const pool = createPool(async (text, values) => {
     executedQueries.push({ text, values })
     if (text.includes('COUNT(*)')) {
-      return { rows: [{ total: '0' }], rowCount: 1 } as QueryResult
+      return createMockQueryResult([{ total: '0' }], 1)
     }
-    return { rows: [], rowCount: 0 } as QueryResult
+    return createMockQueryResult([], 0)
   })
 
   // Global history (no userId)
