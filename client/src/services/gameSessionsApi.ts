@@ -79,9 +79,6 @@ export type UserProfile = {
   createdAt: string
 }
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'
-).replace(/\/+$/, '')
 const REQUEST_TIMEOUT_MS = 5000
 const SESSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -94,37 +91,56 @@ export class GameSessionApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
+  const candidateUrls: string[] = []
+  const customBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
+  if (customBase) {
+    candidateUrls.push(`${customBase}${path}`)
+  }
+  candidateUrls.push(`http://localhost:5000${path}`)
+  candidateUrls.push(path)
+
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-  try {
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        ...init.headers,
-      },
-    })
-    let body: unknown
+  let lastResponse: Response | null = null
 
+  try {
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, {
+          ...init,
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...init.headers,
+          },
+        })
+        if (res.status === 404 && url !== candidateUrls[candidateUrls.length - 1]) {
+          continue
+        }
+        lastResponse = res
+        break
+      } catch {
+        // Try next candidate
+      }
+    }
+
+    if (!lastResponse) {
+      throw new GameSessionApiError('The session service is unavailable')
+    }
+
+    let body: unknown
     try {
-      body = await response.json()
+      body = await lastResponse.json()
     } catch {
       throw new GameSessionApiError('The session service returned invalid data')
     }
 
-    if (!response.ok) {
+    if (!lastResponse.ok) {
       throw new GameSessionApiError('The session service is unavailable')
     }
 
     return body as T
-  } catch (error) {
-    if (error instanceof GameSessionApiError) {
-      throw error
-    }
-
-    throw new GameSessionApiError('The session service is unavailable')
   } finally {
     window.clearTimeout(timeoutId)
   }
@@ -328,9 +344,13 @@ export async function fetchUsers(): Promise<UserProfile[]> {
 }
 
 export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
-  const response = await request<{
-    success: boolean
-    data?: UserProfile | null
-  }>(`/api/auth/me?userId=${encodeURIComponent(userId)}`, { method: 'GET' })
-  return response.data ?? null
+  try {
+    const response = await request<{
+      success: boolean
+      data?: UserProfile | null
+    }>(`/api/auth/profile/${encodeURIComponent(userId)}`, { method: 'GET' })
+    return response.data ?? null
+  } catch {
+    return null
+  }
 }

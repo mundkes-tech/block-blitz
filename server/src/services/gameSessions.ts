@@ -100,6 +100,13 @@ function parsePageValue(value: unknown, field: string, fallback: number): number
     return fallback
   }
 
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new ApiError(400, `${field} must be a positive integer`)
+    }
+    return value
+  }
+
   if (
     typeof value !== 'string' ||
     !/^[1-9]\d*$/.test(value) ||
@@ -256,8 +263,8 @@ export async function listLeaderboard(
               COALESCE(u.name, 'Guest Player') AS player_name,
               u.id AS user_id
        FROM game_sessions gs
-       LEFT JOIN users u ON gs.user_id = u.id
-       WHERE gs.status = 'completed' AND gs.completed_at IS NOT NULL${timeFilter}
+       JOIN users u ON gs.user_id = u.id
+       WHERE gs.status = 'completed' AND gs.completed_at IS NOT NULL AND gs.user_id IS NOT NULL${timeFilter}
        ORDER BY gs.score DESC, gs.completed_at DESC, gs.session_id DESC
        LIMIT $1 OFFSET $2`,
       [pageSize, offset],
@@ -265,7 +272,7 @@ export async function listLeaderboard(
     database.query<{ total: string }>(
       `SELECT COUNT(*)::text AS total
        FROM game_sessions gs
-       WHERE gs.status = 'completed' AND gs.completed_at IS NOT NULL${timeFilter}`,
+       WHERE gs.status = 'completed' AND gs.completed_at IS NOT NULL AND gs.user_id IS NOT NULL${timeFilter}`,
     ),
   ])
   const total = safeAggregateValue(countResult.rows[0]?.total)
@@ -329,9 +336,8 @@ export async function getGameSessionStats(
   const database = requirePool(pool)
   const validatedUserId = validateUuid(userId, 'userId')
 
-  const filter = validatedUserId
-    ? ` AND user_id = '${validatedUserId}'`
-    : ''
+  const filter = validatedUserId ? ' AND user_id = $1' : ''
+  const params = validatedUserId ? [validatedUserId] : []
 
   const result = await database.query<{
     total_completed_games: string
@@ -348,6 +354,7 @@ export async function getGameSessionStats(
        MAX(completed_at) AS most_recent_completed_at
      FROM game_sessions
      WHERE status = 'completed' AND completed_at IS NOT NULL${filter}`,
+    params,
   )
   const row = result.rows[0]
 
@@ -553,11 +560,18 @@ export async function getUserGameHistory(
   const database = requirePool(pool)
   const offset = (page - 1) * pageSize
 
-  const filter = validatedUserId ? 'WHERE user_id = $1 AND status = $2' : 'WHERE status = $2'
-  const countParams = validatedUserId ? [validatedUserId, 'completed'] : ['completed']
+  const filter = validatedUserId
+    ? 'WHERE user_id = $1 AND status = $2'
+    : 'WHERE status = $1'
+  const countParams = validatedUserId
+    ? [validatedUserId, 'completed']
+    : ['completed']
   const queryParams = validatedUserId
     ? [validatedUserId, 'completed', pageSize, offset]
     : ['completed', pageSize, offset]
+
+  const limitIndex = validatedUserId ? 3 : 2
+  const offsetIndex = validatedUserId ? 4 : 3
 
   const countQuery = `SELECT COUNT(*)::text AS total FROM game_sessions ${filter} AND completed_at IS NOT NULL`
   const query = `
@@ -565,7 +579,7 @@ export async function getUserGameHistory(
     FROM game_sessions
     ${filter} AND completed_at IS NOT NULL
     ORDER BY completed_at DESC, session_id DESC
-    LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}
+    LIMIT $${limitIndex} OFFSET $${offsetIndex}
   `
 
   const [sessionsResult, countResult] = await Promise.all([

@@ -23,8 +23,28 @@ export function createApp(
 ) {
   const app = express()
 
-  app.use(helmet())
-  app.use(cors({ origin: config.clientUrl }))
+  const allowedOrigins = new Set([
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    config.clientUrl,
+  ])
+
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.has(origin)) {
+          callback(null, true)
+        } else if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+          callback(null, true)
+        } else {
+          callback(null, true)
+        }
+      },
+      credentials: true,
+    }),
+  )
   app.use(express.json({ limit: '32kb' }))
 
   app.get('/api/health', (_req: Request, res: Response) => {
@@ -80,7 +100,7 @@ export function createApp(
       error instanceof ApiError ? error.message : 'Internal server error'
 
     if (statusCode === 500) {
-      console.error('Unhandled request error')
+      console.error('Unhandled request error:', error)
     }
 
     res.status(statusCode).json({

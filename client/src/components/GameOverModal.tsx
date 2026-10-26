@@ -6,9 +6,11 @@ type GameOverModalProps = {
   highestCombo: number
   blocksPlaced: number
   durationSeconds: number
+  currentUser?: import('../services/gameSessionsApi').UserProfile | null
   onPlayAgain: () => void
   onOpenLeaderboard: () => void
   onOpenDashboard: () => void
+  onOpenAuth?: () => void
   onHome: () => void
 }
 
@@ -20,9 +22,11 @@ export function GameOverModal({
   highestCombo,
   blocksPlaced,
   durationSeconds,
+  currentUser,
   onPlayAgain,
   onOpenLeaderboard,
   onOpenDashboard,
+  onOpenAuth,
   onHome,
 }: GameOverModalProps) {
   const formatTime = (secs: number) => {
@@ -70,6 +74,18 @@ export function GameOverModal({
             <strong>{formatTime(durationSeconds)}</strong>
           </div>
         </div>
+
+        {!currentUser && score > 0 && onOpenAuth && (
+          <div
+            className="game-over-guest-banner"
+            onClick={onOpenAuth}
+            role="button"
+            tabIndex={0}
+            title="Save your high score by signing in"
+          >
+            <span>💾 <strong>Save your score to the Leaderboard!</strong> Sign in or Register for free →</span>
+          </div>
+        )}
 
         <div className="game-over-actions">
           <button className="primary-button btn-large" type="button" onClick={onPlayAgain}>

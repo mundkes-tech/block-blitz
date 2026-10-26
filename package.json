@@ -5,11 +5,13 @@
   "description": "A full-stack browser-based block puzzle game",
   "scripts": {
     "dev:client": "npm --prefix client run dev",
-    "dev:server": "tsx server/src/index.ts",
+    "dev:server": "tsx watch server/src/index.ts",
     "build:client": "npm --prefix client run build",
     "build:server": "tsc -p server/tsconfig.json",
+    "build": "npm run build:server",
+    "start": "node server/dist/index.js",
     "test:client": "node --import tsx --test client/src/game/gameLogic.test.ts",
-    "test:server": "node --import tsx --test server/test/gameSessions.test.ts",
+    "test:server": "node --import tsx --test server/test/gameSessions.test.ts server/test/auth.test.ts",
     "test": "npm run test:client && npm run test:server"
   },
   "dependencies": {

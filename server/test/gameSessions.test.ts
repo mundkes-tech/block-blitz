@@ -8,6 +8,7 @@ import { ApiError } from '../src/errors.js'
 import {
   completeGameSession,
   getGameSessionStats,
+  getUserGameHistory,
   listCompletedGameSessions,
   listLeaderboard,
 } from '../src/services/gameSessions.js'
@@ -234,3 +235,30 @@ test('returns safe responses for malformed and oversized JSON bodies', async () 
     await stopTestServer(server)
   }
 })
+
+test('getUserGameHistory supports both global and user-specific history queries', async () => {
+  const executedQueries: Array<{ text: string; values?: readonly unknown[] }> = []
+  const pool = createPool(async (text, values) => {
+    executedQueries.push({ text, values })
+    if (text.includes('COUNT(*)')) {
+      return { rows: [{ total: '0' }], rowCount: 1 } as QueryResult
+    }
+    return { rows: [], rowCount: 0 } as QueryResult
+  })
+
+  // Global history (no userId)
+  const globalResult = await getUserGameHistory(pool, undefined, 1, 10)
+  assert.equal(globalResult.page, 1)
+  assert.equal(globalResult.total, 0)
+  assert.ok(executedQueries[0].text.includes('WHERE status = $1'))
+  assert.deepEqual(executedQueries[0].values, ['completed', 10, 0])
+
+  // User-specific history
+  executedQueries.length = 0
+  const userResult = await getUserGameHistory(pool, validSessionId, 2, 5)
+  assert.equal(userResult.page, 2)
+  assert.equal(userResult.total, 0)
+  assert.ok(executedQueries[0].text.includes('WHERE user_id = $1 AND status = $2'))
+  assert.deepEqual(executedQueries[0].values, [validSessionId, 'completed', 5, 5])
+})
+

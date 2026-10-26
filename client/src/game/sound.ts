@@ -13,8 +13,6 @@ type AudioContextConstructor = new () => AudioContext
 
 export class SoundEffects {
   private context: AudioContext | null = null
-  private bgmIntervalId: number | null = null
-  private bgmGain: GainNode | null = null
   private isBgmPlaying = false
 
   // Static audio file instances
@@ -33,27 +31,53 @@ export class SoundEffects {
     if (typeof window === 'undefined') return
 
     try {
-      // Background music
-      this.bgmAudio = new Audio('/music/bgm.mp3')
+      // Background music using bgm.mp3
+      this.bgmAudio = new Audio('/bgm.mp3')
       this.bgmAudio.loop = true
-      this.bgmAudio.volume = 0.25
+      this.bgmAudio.volume = 0.35
+      this.bgmAudio.preload = 'auto'
+      this.bgmAudio.addEventListener('error', () => {
+        if (this.bgmAudio && !this.bgmAudio.src.includes('/music/bgm.mp3')) {
+          this.bgmAudio.src = '/music/bgm.mp3'
+          this.bgmAudio.load()
+          if (this.isBgmPlaying) {
+            this.bgmAudio.play().catch(() => {})
+          }
+        }
+      })
 
       // Sound pools for zero-latency rapid playback
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         const click = new Audio('/sounds/click.wav')
-        click.volume = 0.35
+        click.volume = 0.4
+        click.preload = 'auto'
+        click.addEventListener('error', () => {
+          click.src = '/click.wav'
+        })
         this.clickAudioPool.push(click)
 
         const place = new Audio('/sounds/place.wav')
-        place.volume = 0.45
+        place.volume = 0.55
+        place.preload = 'auto'
+        place.addEventListener('error', () => {
+          place.src = '/place.wav'
+        })
         this.placeAudioPool.push(place)
 
-        const clear = new Audio('/sounds/clear.ogg')
-        clear.volume = 0.55
+        const clear = new Audio('/sounds/clear.wav')
+        clear.volume = 0.65
+        clear.preload = 'auto'
+        clear.addEventListener('error', () => {
+          clear.src = '/sounds/clear.ogg'
+        })
         this.clearAudioPool.push(clear)
 
         const combo = new Audio('/sounds/combo.wav')
-        combo.volume = 0.6
+        combo.volume = 0.65
+        combo.preload = 'auto'
+        combo.addEventListener('error', () => {
+          combo.src = '/combo.wav'
+        })
         this.comboAudioPool.push(combo)
       }
     } catch {
@@ -64,16 +88,17 @@ export class SoundEffects {
   private playFromPool(pool: HTMLAudioElement[], playbackRate = 1.0, volume = 0.5): boolean {
     if (!pool || pool.length === 0) return false
     try {
-      this.poolIndex = (this.poolIndex + 1) % pool.length
-      const audio = pool[this.poolIndex]
+      let audio = pool.find((a) => a.paused || a.ended)
+      if (!audio) {
+        this.poolIndex = (this.poolIndex + 1) % pool.length
+        audio = pool[this.poolIndex]
+      }
       audio.playbackRate = playbackRate
       audio.volume = volume
       audio.currentTime = 0
       const promise = audio.play()
       if (promise !== undefined) {
-        promise.catch(() => {
-          // Playback error caught safely
-        })
+        promise.catch(() => {})
       }
       return true
     } catch {
@@ -247,76 +272,38 @@ export class SoundEffects {
   }
 
   startBgm(): void {
-    if (this.isBgmPlaying) return
     this.isBgmPlaying = true
 
-    // Try playing real BGM file first
-    if (this.bgmAudio) {
-      this.bgmAudio.currentTime = 0
-      const playPromise = this.bgmAudio.play()
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            return
-          })
-          .catch(() => {
-            // If browser blocks audio file playback, fall back to Web Audio synth
-            this.startSynthBgm()
-          })
-        return
-      }
+    if (!this.bgmAudio) {
+      this.bgmAudio = new Audio('/bgm.mp3')
+      this.bgmAudio.loop = true
+      this.bgmAudio.volume = 0.35
+      this.bgmAudio.preload = 'auto'
     }
 
-    this.startSynthBgm()
-  }
-
-  private startSynthBgm(): void {
-    const ctx = this.getContext()
-    if (!ctx) return
-
-    const scale = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25]
-    let step = 0
-
-    this.bgmGain = ctx.createGain()
-    this.bgmGain.gain.setValueAtTime(0.015, ctx.currentTime)
-    this.bgmGain.connect(ctx.destination)
-
-    this.bgmIntervalId = window.setInterval(() => {
-      if (!this.isBgmPlaying || !this.context) return
-      try {
-        const noteCtx = this.context
-        const now = noteCtx.currentTime
-        const note = scale[step % scale.length]
-        step = (step + 1) % scale.length
-
-        const osc = noteCtx.createOscillator()
-        const gain = noteCtx.createGain()
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(note, now)
-        gain.gain.setValueAtTime(0.012, now)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6)
-
-        osc.connect(gain)
-        if (this.bgmGain) {
-          gain.connect(this.bgmGain)
-        }
-        osc.start(now)
-        osc.stop(now + 0.6)
-      } catch {
-        // ignore tick glitch
+    if (this.bgmAudio.paused) {
+      const playPromise = this.bgmAudio.play()
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // If browser policy prevents autoplay before user interaction, unlock on first gesture
+          const unlockAudio = () => {
+            if (this.isBgmPlaying && this.bgmAudio) {
+              this.bgmAudio.play().catch(() => {})
+            }
+            window.removeEventListener('pointerdown', unlockAudio)
+            window.removeEventListener('keydown', unlockAudio)
+          }
+          window.addEventListener('pointerdown', unlockAudio, { once: true })
+          window.addEventListener('keydown', unlockAudio, { once: true })
+        })
       }
-    }, 600)
+    }
   }
 
   stopBgm(): void {
     this.isBgmPlaying = false
     if (this.bgmAudio) {
       this.bgmAudio.pause()
-      this.bgmAudio.currentTime = 0
-    }
-    if (this.bgmIntervalId !== null) {
-      window.clearInterval(this.bgmIntervalId)
-      this.bgmIntervalId = null
     }
   }
 

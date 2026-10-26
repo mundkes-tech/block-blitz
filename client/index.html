@@ -10,6 +10,33 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      html, body, #root, * {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+      ::-webkit-scrollbar, *::-webkit-scrollbar, html::-webkit-scrollbar, body::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        background: transparent !important;
+        -webkit-appearance: none !important;
+      }
+      ::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb,
+      ::-webkit-scrollbar-track, *::-webkit-scrollbar-track,
+      ::-webkit-scrollbar-button, *::-webkit-scrollbar-button,
+      ::-webkit-scrollbar-corner, *::-webkit-scrollbar-corner {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      html, body {
+        overflow: hidden !important;
+        height: 100% !important;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

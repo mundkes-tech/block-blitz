@@ -14,6 +14,8 @@ type NavbarProps = {
   onOpenDashboard: () => void
   onOpenChallenge: () => void
   onOpenAchievements: () => void
+  onHome?: () => void
+  onOpenAuth?: () => void
   levelInfo?: PlayerLevelInfo
   currentUser?: UserProfile | null
 }
@@ -29,16 +31,30 @@ export function Navbar({
   onOpenDashboard,
   onOpenChallenge,
   onOpenAchievements,
+  onHome,
+  onOpenAuth,
   levelInfo,
   currentUser,
 }: NavbarProps) {
   return (
     <nav className="top-navbar" aria-label="Main application header">
-      <div className="navbar-left">
+      <div
+        className="navbar-left"
+        onClick={onHome}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onHome?.()
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        style={{ cursor: 'pointer' }}
+        title="Go to Home"
+      >
         <span className="navbar-logo-icon">🧩</span>
         <div className="navbar-branding">
           <span className="navbar-title">BLOCK BLITZ</span>
-          <span className="navbar-tagline">PUZZLE • PLACE • CLEAR • COMBO</span>
         </div>
       </div>
 
@@ -124,18 +140,29 @@ export function Navbar({
           {soundEnabled ? '🔊' : '🔈'}
         </button>
 
-        {/* User Profile avatar pill */}
-        <button
-          className="user-profile-pill"
-          type="button"
-          onClick={onOpenDashboard}
-          title={`Active Player: ${currentUser?.name ?? 'Guest'}`}
-        >
-          <span className="avatar-dot">
-            {currentUser?.name ? currentUser.name.charAt(0) : 'P'}
-          </span>
-          <span className="user-pill-name">{currentUser?.name ?? 'Player'}</span>
-        </button>
+        {/* User Profile pill / Sign In button */}
+        {currentUser ? (
+          <button
+            className="user-profile-pill"
+            type="button"
+            onClick={onOpenDashboard}
+            title={`Active Player: ${currentUser.name} (${currentUser.email})`}
+          >
+            <span className="avatar-dot">
+              {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'P'}
+            </span>
+            <span className="user-pill-name">{currentUser.name}</span>
+          </button>
+        ) : (
+          <button
+            className="nav-signin-btn"
+            type="button"
+            onClick={onOpenAuth}
+            title="Sign in or register an account"
+          >
+            🔐 <span className="nav-signin-text">Sign In</span>
+          </button>
+        )}
       </div>
     </nav>
   )

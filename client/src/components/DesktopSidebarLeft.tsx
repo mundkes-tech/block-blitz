@@ -1,8 +1,4 @@
-import type { UserProfile } from '../services/gameSessionsApi'
-import type { PlayerLevelInfo } from '../game/achievements'
-
 type DesktopSidebarLeftProps = {
-  currentUser?: UserProfile | null
   currentLinesCleared: number
   targetLines?: number
   rerollsLeft: number
@@ -13,14 +9,10 @@ type DesktopSidebarLeftProps = {
   onToggleHammer: () => void
   onUseUndo: () => void
   canUndo: boolean
-  onOpenDashboard: () => void
   onOpenChallenge: () => void
-  onOpenAchievements: () => void
-  levelInfo?: PlayerLevelInfo
 }
 
 export function DesktopSidebarLeft({
-  currentUser,
   currentLinesCleared,
   targetLines = 10,
   rerollsLeft,
@@ -31,54 +23,13 @@ export function DesktopSidebarLeft({
   onToggleHammer,
   onUseUndo,
   canUndo,
-  onOpenDashboard,
   onOpenChallenge,
-  onOpenAchievements,
-  levelInfo,
 }: DesktopSidebarLeftProps) {
   const challengeProgress = Math.min(100, Math.round((currentLinesCleared / targetLines) * 100))
   const isChallengeDone = currentLinesCleared >= targetLines
 
   return (
-    <aside className="desktop-sidebar desktop-sidebar--left" aria-label="Player profile and game boosters">
-      {/* Profile Card */}
-      <div className="sidebar-card profile-sidebar-card" onClick={onOpenDashboard} role="button" tabIndex={0} title="Click to view full player dashboard">
-        <div className="sidebar-card-header">
-          <span className="eyebrow">ACTIVE PLAYER</span>
-          <span className="pill-status">CONNECTED</span>
-        </div>
-        <div className="sidebar-profile-content">
-          <div className="sidebar-avatar">
-            {currentUser?.name ? currentUser.name.charAt(0) : 'P'}
-          </div>
-          <div className="sidebar-profile-meta">
-            <h4>{currentUser?.name ?? 'Player 1'}</h4>
-            <p>{currentUser?.email ?? 'player@veloop.dev'}</p>
-          </div>
-        </div>
-
-        {/* Level & XP Mini Bar */}
-        {levelInfo && (
-          <div className="sidebar-level-section">
-            <div className="sidebar-level-row">
-              <span className="level-tag">Level {levelInfo.level}</span>
-              <strong className="level-tier-name">{levelInfo.title}</strong>
-            </div>
-            <div className="sidebar-progress-track">
-              <div className="sidebar-progress-fill" style={{ width: `${levelInfo.progressPercent}%` }} />
-            </div>
-            <div className="sidebar-progress-label">
-              <span>{levelInfo.currentXP} XP</span>
-              <span>Next: {levelInfo.nextLevelXP} XP</span>
-            </div>
-          </div>
-        )}
-
-        <div className="sidebar-stat-mini">
-          <span>Personal Best</span>
-          <strong>{(currentUser?.highestScore ?? 0).toLocaleString()} pts</strong>
-        </div>
-      </div>
+    <aside className="desktop-sidebar desktop-sidebar--left" aria-label="Tactical boosters and daily challenges">
 
       {/* Power-Up Boosters (Section 47 Bonus Features) */}
       <div className="sidebar-card boosters-sidebar-card">
@@ -155,18 +106,6 @@ export function DesktopSidebarLeft({
           <span>{Math.min(currentLinesCleared, targetLines)} / {targetLines} Lines</span>
           <strong>{isChallengeDone ? 'COMPLETED! 🎉' : `${challengeProgress}%`}</strong>
         </div>
-      </div>
-
-      {/* Badges / Achievements Shortcut */}
-      <div className="sidebar-card achievements-shortcut-card" onClick={onOpenAchievements} role="button" tabIndex={0} title="View all badges and achievements">
-        <div className="sidebar-card-header">
-          <span className="eyebrow">BADGES</span>
-          <span className="mission-icon">🎖️</span>
-        </div>
-        <p className="sidebar-card-desc">Complete in-game feats to earn XP and level up your player rank!</p>
-        <button className="sidebar-link-btn" type="button" onClick={onOpenAchievements}>
-          View Career Badges →
-        </button>
       </div>
     </aside>
   )

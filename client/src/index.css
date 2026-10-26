@@ -10,26 +10,56 @@
   background: #0d1420;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 html {
-  overflow-x: hidden;
-}
-
-html,
-body,
-#root {
   min-height: 100%;
-  margin: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
   min-width: 320px;
-  min-height: 100vh;
+  overflow-y: auto;
   overflow-x: hidden;
   background:
     radial-gradient(circle at 50% 0%, #1b2c43 0%, transparent 42rem),
     #0d1420;
+}
+
+#root {
+  min-height: 100%;
+}
+
+/* Custom cyber scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #10b981;
+  border-radius: 9999px;
+  border: 2px solid #080d16;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #34d399;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #10b981 #080d16;
 }

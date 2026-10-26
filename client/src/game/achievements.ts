@@ -101,12 +101,13 @@ export type PlayerLevelInfo = {
 
 export function calculatePlayerLevel(totalXP: number): PlayerLevelInfo {
   const tiers = [
-    { level: 1, title: 'Novice', maxXP: 300 },
-    { level: 2, title: 'Apprentice', maxXP: 800 },
-    { level: 3, title: 'Tactician', maxXP: 1800 },
-    { level: 4, title: 'Master', maxXP: 3500 },
-    { level: 5, title: 'Grandmaster', maxXP: 6000 },
-    { level: 6, title: 'Legendary', maxXP: 10000 },
+    { level: 0, title: 'Rookie', maxXP: 300 },
+    { level: 1, title: 'Novice', maxXP: 800 },
+    { level: 2, title: 'Apprentice', maxXP: 1800 },
+    { level: 3, title: 'Tactician', maxXP: 3500 },
+    { level: 4, title: 'Master', maxXP: 6000 },
+    { level: 5, title: 'Grandmaster', maxXP: 10000 },
+    { level: 6, title: 'Legendary', maxXP: 15000 },
   ]
 
   let currentTier = tiers[0]
