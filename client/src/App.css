@@ -2174,11 +2174,44 @@ body {
 .game-bottom-actions {
   display: flex;
   justify-content: center;
-  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.text-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1.15rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  color: #94a3b8;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 150ms ease;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.text-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.text-pill-btn:active {
+  transform: translateY(1px);
 }
 
 .desktop-only-actions {
   display: flex;
+  margin-top: 0.85rem;
 }
 
 .mobile-only-actions {
@@ -2933,7 +2966,7 @@ button,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.85rem;
+  gap: 1.25rem;
   position: relative;
   align-self: center;
 }
@@ -3450,8 +3483,8 @@ button,
   .widescreen-arena-wrapper {
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.5rem max(1rem, env(safe-area-inset-bottom));
+    gap: 1.25rem;
+    padding: 1.15rem 0.65rem max(1.25rem, env(safe-area-inset-bottom));
     width: 100%;
     min-height: max-content;
     flex-shrink: 0;
@@ -3466,9 +3499,9 @@ button,
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.6rem;
+    gap: 0.65rem;
     width: 100%;
-    margin: 0.15rem 0;
+    margin: 0;
   }
 
   .mobile-booster-btn {
@@ -3534,12 +3567,12 @@ button,
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1.25rem;
   }
 
   .board-outer-wrapper {
-    width: min(calc(100vw - 2rem), calc(100dvh - 330px), 340px);
-    height: min(calc(100vw - 2rem), calc(100dvh - 330px), 340px);
+    width: min(calc(100vw - 2rem), calc(100dvh - 375px), 320px);
+    height: min(calc(100vw - 2rem), calc(100dvh - 375px), 320px);
   }
 
   .piece-dock-sidebar {
@@ -3645,8 +3678,8 @@ button,
     display: flex !important;
     justify-content: center;
     width: 100%;
-    margin-top: 0.2rem;
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    margin-top: 0;
+    padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
   }
 }
 
@@ -3820,23 +3853,23 @@ button,
 
 @media (max-width: 480px) {
   .board-outer-wrapper {
-    width: min(calc(100vw - 1.25rem), calc(100dvh - 315px), 320px);
-    height: min(calc(100vw - 1.25rem), calc(100dvh - 315px), 320px);
+    width: min(calc(100vw - 1.25rem), calc(100dvh - 370px), 305px);
+    height: min(calc(100vw - 1.25rem), calc(100dvh - 370px), 305px);
   }
 
   .game-board {
-    padding: 0.55rem;
-    gap: 0.25rem;
-    border-radius: 1.2rem;
+    padding: 0.5rem;
+    gap: 0.22rem;
+    border-radius: 1.15rem;
   }
 
   .widescreen-arena-wrapper {
-    gap: 0.75rem;
-    padding-top: 0.25rem;
+    gap: 1.15rem;
+    padding-top: 0.95rem;
   }
 
   .game-shell {
-    gap: 0.65rem;
+    gap: 1.15rem;
   }
 
   .game-hud {
@@ -3918,12 +3951,12 @@ button,
   }
 
   .widescreen-arena-wrapper {
-    gap: 0.55rem;
-    padding: 0.25rem 0.45rem max(0.5rem, env(safe-area-inset-bottom));
+    gap: 0.85rem;
+    padding: 0.65rem 0.45rem max(0.65rem, env(safe-area-inset-bottom));
   }
 
   .game-shell {
-    gap: 0.5rem;
+    gap: 0.85rem;
   }
 
   .game-hud {
@@ -3944,8 +3977,8 @@ button,
   }
 
   .board-outer-wrapper {
-    width: min(calc(100vw - 1.25rem), calc(100dvh - 295px), 280px);
-    height: min(calc(100vw - 1.25rem), calc(100dvh - 295px), 280px);
+    width: min(calc(100vw - 1.25rem), calc(100dvh - 340px), 275px);
+    height: min(calc(100vw - 1.25rem), calc(100dvh - 340px), 275px);
   }
 
   .game-board {
