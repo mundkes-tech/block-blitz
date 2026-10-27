@@ -799,10 +799,12 @@ body {
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  min-height: calc(100vh - 65px);
-  padding: 0.85rem clamp(1rem, 3.5vw, 2.5rem) 2.5rem;
+  min-height: calc(100vh - 50px);
+  padding: 1rem clamp(0.75rem, 3.5vw, 2.5rem) max(4rem, calc(2.5rem + env(safe-area-inset-bottom)));
   box-sizing: border-box;
-  overflow-y: auto;
+  overflow-y: visible;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   position: relative;
 }
 
@@ -1732,8 +1734,9 @@ body {
 
 @media (max-width: 640px) {
   .home-screen-portal {
-    padding: 1rem 0.85rem 2.5rem;
+    padding: 1rem 0.85rem max(4.5rem, calc(3rem + env(safe-area-inset-bottom)));
     gap: 1.25rem;
+    touch-action: pan-y;
   }
 
   .portal-brand-title {
@@ -3892,7 +3895,9 @@ button,
   .navbar-title {
     display: none;
   }
+}
 
+@media (max-width: 768px) {
   .home-ambient-auras {
     opacity: 0.6;
   }
