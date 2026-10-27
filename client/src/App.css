@@ -3800,11 +3800,6 @@ button,
     padding: 0;
   }
 
-  /* On mobile <= 768px, hide music button so sound FX and profile fit without overflow */
-  .audio-btn--music {
-    display: none !important;
-  }
-
   .user-profile-pill {
     padding: 0.15rem 0.35rem;
     flex-shrink: 0;
