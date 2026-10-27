@@ -120,7 +120,7 @@ export function Navbar({
 
         {/* Music Toggle (Section 22) */}
         <button
-          className={`audio-btn${musicEnabled ? ' audio-btn--active' : ''}`}
+          className={`audio-btn audio-btn--music${musicEnabled ? ' audio-btn--active' : ''}`}
           type="button"
           onClick={onToggleMusic}
           title={musicEnabled ? 'Turn Music Off' : 'Turn Music On'}
@@ -131,7 +131,7 @@ export function Navbar({
 
         {/* Sound FX Toggle (Section 21) */}
         <button
-          className={`audio-btn${soundEnabled ? ' audio-btn--active' : ''}`}
+          className={`audio-btn audio-btn--sfx${soundEnabled ? ' audio-btn--active' : ''}`}
           type="button"
           onClick={onToggleSound}
           title={soundEnabled ? 'Turn Sound FX Off' : 'Turn Sound FX On'}
