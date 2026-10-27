@@ -930,6 +930,8 @@ function App() {
       {phase === 'home' && location.pathname !== '/play' ? (
         <HomeScreen
           bestScore={bestScore}
+          totalLinesCleared={totalLinesCleared}
+          unlockedBadgesCount={unlockedAchievements.length}
           onPlay={startNewGame}
           currentUser={currentUser}
           levelInfo={playerLevelInfo}

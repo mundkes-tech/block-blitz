@@ -37,7 +37,8 @@ export function Navbar({
   currentUser,
 }: NavbarProps) {
   return (
-    <nav className="top-navbar" aria-label="Main application header">
+    <>
+      <nav className="top-navbar" aria-label="Main application header">
       <div
         className="navbar-left"
         onClick={onHome}
@@ -165,5 +166,7 @@ export function Navbar({
         )}
       </div>
     </nav>
+    <div className="navbar-spacer" aria-hidden="true" />
+  </>
   )
 }

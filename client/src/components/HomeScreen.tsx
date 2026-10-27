@@ -6,6 +6,8 @@ type GameMode = 'classic' | 'blitz' | 'bomb'
 
 type HomeScreenProps = {
   bestScore: number
+  totalLinesCleared?: number
+  unlockedBadgesCount?: number
   onPlay: (mode?: GameMode) => void
   currentUser?: UserProfile | null
   levelInfo?: PlayerLevelInfo
@@ -17,6 +19,8 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   bestScore,
+  totalLinesCleared = 0,
+  unlockedBadgesCount = 0,
   onPlay,
   currentUser,
   levelInfo,
@@ -28,6 +32,14 @@ export function HomeScreen({
   const [selectedMode, setSelectedMode] = useState<GameMode>('classic')
   const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const showcaseRef = useRef<HTMLDivElement>(null)
+
+  const dailyTargetLines = 10
+  const dailyLinesProgress = Math.min(100, Math.round((totalLinesCleared / dailyTargetLines) * 100))
+  const isDailyCompleted = totalLinesCleared >= dailyTargetLines
+
+  const totalBadges = 8
+  const badgesProgress = Math.min(100, Math.round((unlockedBadgesCount / totalBadges) * 100))
+  const areBadgesCompleted = unlockedBadgesCount >= totalBadges
 
   const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!showcaseRef.current) return
@@ -68,8 +80,8 @@ export function HomeScreen({
         <header className="portal-hero-header">
           <div className="portal-brand-pill">
             <span className="brand-gem-spin">💎</span>
-            <span className="brand-pill-text">VELOOP ARCADE GAMING PORTAL</span>
-            <span className="brand-pill-badge">v2.0 PRO</span>
+            <span className="brand-pill-text">ARCADE BLOCK PUZZLE</span>
+            <span className="brand-pill-badge">OFFICIAL</span>
           </div>
 
           <h1 className="portal-brand-title">
@@ -82,7 +94,7 @@ export function HomeScreen({
           </p>
 
           <p className="portal-lead-text">
-            Fit geometric neon blocks onto the 8×8 grid, chain explosive combo clears, and unlock real VeLoop reward perks!
+            Fit geometric neon blocks onto the 8×8 grid, chain explosive combo clears, and climb the global leaderboards!
           </p>
         </header>
 
@@ -107,7 +119,7 @@ export function HomeScreen({
                 <div className="ribbon-stats-row">
                   <span className="ribbon-stat-item">🏆 Best: <strong>{bestScore.toLocaleString()}</strong> pts</span>
                   <span className="ribbon-stat-divider">•</span>
-                  <span className="ribbon-stat-item">🪙 VeLoop: <strong>+50 XP</strong> / game</span>
+                  <span className="ribbon-stat-item">🎖️ Badges: <strong>{unlockedBadgesCount} / {totalBadges}</strong></span>
                 </div>
               </div>
             </div>
@@ -125,7 +137,7 @@ export function HomeScreen({
                 <span className="launch-btn-front">
                   <span className="launch-btn-icon">🎮</span>
                   <span className="launch-btn-label">START GAME</span>
-                  <span className="launch-btn-xp-pill">+50 XP</span>
+                  <span className="launch-btn-xp-pill">PLAY NOW</span>
                 </span>
               </button>
             </div>
@@ -274,7 +286,7 @@ export function HomeScreen({
                 <div className="showcase-chips-cluster">
                   <span className="showcase-chip chip-top">Combo 3×! 🔥</span>
                   <span className="showcase-chip chip-left">Line Clear! ⚡</span>
-                  <span className="showcase-chip chip-bottom">💎 +250 VeLoop Pts</span>
+                  <span className="showcase-chip chip-bottom">High Score! 🏆</span>
                 </div>
               </div>
             </div>
@@ -286,7 +298,7 @@ export function HomeScreen({
                   <span className="quests-icon">🎯</span>
                   <div>
                     <strong className="quests-heading">DAILY MISSIONS</strong>
-                    <span className="quests-subheading">Complete to earn bonus XP</span>
+                    <span className="quests-subheading">Complete to unlock badges & rank</span>
                   </div>
                 </div>
                 <button
@@ -299,28 +311,38 @@ export function HomeScreen({
               </div>
 
               <div className="quests-list">
-                <div className="quest-row" onClick={onOpenChallenge} role="button" tabIndex={0}>
+                <div className="quest-row" onClick={onOpenChallenge} role="button" tabIndex={0} title="Open Daily Challenge">
                   <div className="quest-icon-badge">⚡</div>
                   <div className="quest-details">
                     <div className="quest-label-row">
-                      <span className="quest-name">Line Clearer</span>
-                      <span className="quest-count">3 / 5</span>
+                      <span className="quest-name">Daily Target: 10 Lines</span>
+                      <span className={`quest-count ${isDailyCompleted ? 'text-emerald' : ''}`}>
+                        {isDailyCompleted ? 'COMPLETED! ⭐' : `${Math.min(totalLinesCleared, dailyTargetLines)} / ${dailyTargetLines}`}
+                      </span>
                     </div>
                     <div className="quest-progress-track">
-                      <div className="quest-progress-bar" style={{ width: '60%' }} />
+                      <div
+                        className={`quest-progress-bar ${isDailyCompleted ? 'quest-progress-bar--complete' : ''}`}
+                        style={{ width: `${dailyLinesProgress}%` }}
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="quest-row" onClick={onOpenChallenge} role="button" tabIndex={0}>
-                  <div className="quest-icon-badge">🔥</div>
+                <div className="quest-row" onClick={onOpenAchievements} role="button" tabIndex={0} title="Open Badges">
+                  <div className="quest-icon-badge">🎖️</div>
                   <div className="quest-details">
                     <div className="quest-label-row">
-                      <span className="quest-name">Combo Striker</span>
-                      <span className="quest-count text-emerald">READY! ⭐</span>
+                      <span className="quest-name">Achievements Collector</span>
+                      <span className={`quest-count ${areBadgesCompleted ? 'text-emerald' : ''}`}>
+                        {areBadgesCompleted ? 'ALL UNLOCKED! 👑' : `${unlockedBadgesCount} / ${totalBadges}`}
+                      </span>
                     </div>
                     <div className="quest-progress-track">
-                      <div className="quest-progress-bar quest-progress-bar--complete" style={{ width: '100%' }} />
+                      <div
+                        className={`quest-progress-bar ${areBadgesCompleted ? 'quest-progress-bar--complete' : ''}`}
+                        style={{ width: `${badgesProgress}%` }}
+                      />
                     </div>
                   </div>
                 </div>
