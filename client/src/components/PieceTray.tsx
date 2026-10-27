@@ -36,7 +36,7 @@ function PieceTray({
               <p>Drawing new pieces…</p>
             </div>
           ) : (
-            pieces.map((piece, index) => {
+            pieces.map((piece) => {
               const dimensions = getShapeDimensions(piece.shape)
               const isDragging = activePieceId === piece.id
               const gridStyle = {
@@ -45,17 +45,15 @@ function PieceTray({
               } as CSSProperties
 
               return (
-                <div className="piece-dock-slot" key={piece.id}>
-                  <div className="piece-slot-header">
-                    <span className="piece-slot-tag">Slot {index + 1}</span>
-                    <span className="piece-shape-name">{piece.shape.name}</span>
-                  </div>
-
+                <div
+                  className={`piece-dock-slot${isDragging ? ' piece-dock-slot--dragging' : ''}`}
+                  key={piece.id}
+                >
                   <div
                     className={`piece-preview piece-preview--dock${isDragging ? ' piece-preview--active' : ''}`}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${piece.shape.name} piece in slot ${index + 1}`}
+                    aria-label={`${piece.shape.name} piece`}
                     onPointerDown={(event) => {
                       event.currentTarget.setPointerCapture(event.pointerId)
                       onPointerDown(piece, event)
@@ -74,7 +72,6 @@ function PieceTray({
                             gridRow: row + 1,
                             gridColumn: col + 1,
                             backgroundColor: piece.shape.color,
-                            boxShadow: `inset 0 1px 3px rgba(255, 255, 255, 0.45), 0 2px 6px ${piece.shape.color}88`,
                           }}
                         />
                       ))}

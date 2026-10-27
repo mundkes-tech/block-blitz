@@ -16,6 +16,7 @@ import { DailyChallengeModal } from './components/DailyChallengeModal'
 import { AchievementsModal } from './components/AchievementsModal'
 import { GameOverModal } from './components/GameOverModal'
 import { AuthModal } from './components/AuthModal'
+import { HomeScreen } from './components/HomeScreen'
 import { BOARD_SIZE, createEmptyBoard, type Board } from './game/board'
 import { clearCompletedLines } from './game/lines'
 import { canPlaceShape, placeShape } from './game/placement'
@@ -30,7 +31,6 @@ import {
   calculatePlayerLevel,
   readUnlockedAchievements,
   saveUnlockedAchievements,
-  type PlayerLevelInfo,
 } from './game/achievements'
 import {
   completeGameSession,
@@ -94,175 +94,6 @@ function readStoredBool(key: string, fallback: boolean): boolean {
 function createEmptyColorBoard(): (string | null)[][] {
   return Array.from({ length: BOARD_SIZE }, () =>
     Array.from({ length: BOARD_SIZE }, () => null),
-  )
-}
-
-function HomeScreen({
-  bestScore,
-  onPlay,
-  currentUser,
-  levelInfo,
-}: {
-  bestScore: number
-  onPlay: () => void
-  currentUser?: UserProfile | null
-  levelInfo?: PlayerLevelInfo
-}) {
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
-  const cardRef = useRef<HTMLElement>(null)
-
-  const handlePointerMove = (e: PointerEvent<HTMLElement>) => {
-    if (!cardRef.current) return
-    const rect = cardRef.current.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width - 0.5
-    const y = (e.clientY - rect.top) / rect.height - 0.5
-    setTilt({ x: x * 12, y: -y * 12 })
-  }
-
-  const handlePointerLeave = () => {
-    setTilt({ x: 0, y: 0 })
-  }
-
-  return (
-    <main className="home-screen">
-      {/* Ambient Neon Auras */}
-      <div className="home-ambient-auras" aria-hidden="true">
-        <div className="aura-blob aura-blob--emerald" />
-        <div className="aura-blob aura-blob--cyan" />
-        <div className="aura-blob aura-blob--purple" />
-      </div>
-
-      {/* Floating Tetromino Block Accents */}
-      <div className="home-floating-blocks" aria-hidden="true">
-        <div className="float-block float-block--1" />
-        <div className="float-block float-block--2" />
-        <div className="float-block float-block--3" />
-        <div className="float-block float-block--4" />
-        <div className="float-block float-block--5" />
-      </div>
-
-      <section
-        ref={cardRef}
-        className="home-card"
-        aria-labelledby="home-title"
-        onPointerMove={handlePointerMove}
-        onPointerLeave={handlePointerLeave}
-        style={{
-          transform: `perspective(1000px) rotateX(${tilt.y * 0.35}deg) rotateY(${tilt.x * 0.35}deg)`,
-        }}
-      >
-        <div className="home-card-content">
-          <div className="home-brand-badge">
-            <span className="badge-gem">💎</span>
-            <span>VeLoop Rewards Gaming Portal</span>
-          </div>
-
-          <h1 id="home-title" className="home-brand-title">BLOCK BLITZ</h1>
-          <p className="home-subtitle">Place Blocks • Clear Lines • Earn VeLoop Rewards</p>
-
-          <p className="how-to-play">
-            Fit block shapes onto the 8×8 board to clear rows and columns.
-            Chain explosive combos to rack up high scores and unlock corporate reward perks!
-          </p>
-
-          <div className="veloop-perks-row">
-            <div className="veloop-perk-pill" title="Every line cleared earns reward points">
-              <span className="perk-icon">🪙</span>
-              <span className="perk-label">Points to Perks</span>
-            </div>
-            <div className="veloop-perk-pill" title="Streak clears amplify your rewards">
-              <span className="perk-icon">⚡</span>
-              <span className="perk-label">Combo Boosts</span>
-            </div>
-            <div className="veloop-perk-pill" title="Climb the global and team leaderboards">
-              <span className="perk-icon">🏆</span>
-              <span className="perk-label">Rank Rewards</span>
-            </div>
-          </div>
-
-          <div className="home-primary-actions">
-            <button className="primary-button btn-large pulse-glow glossy-btn" type="button" onClick={onPlay}>
-              <span className="btn-icon">▶</span>
-              <span className="btn-text">Start Game</span>
-              <span className="btn-badge">+50 XP</span>
-            </button>
-          </div>
-
-          <div className="home-member-footer">
-            <div className="member-meta-item">
-              <span className="meta-icon">👤</span>
-              <span className="meta-text">{currentUser?.name ?? 'VeLoop Member'}</span>
-            </div>
-            <span className="meta-divider">•</span>
-            <div className="member-meta-item">
-              <span className="meta-icon">🏆</span>
-              <span className="meta-text">Best: <strong>{bestScore.toLocaleString()}</strong> pts</span>
-            </div>
-            {levelInfo && (
-              <>
-                <span className="meta-divider">•</span>
-                <div className="member-meta-item">
-                  <span className="meta-icon">⭐</span>
-                  <span className="meta-text">Lv.{levelInfo.level} ({levelInfo.title})</span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="home-card-preview" aria-hidden="true">
-          <div className="home-preview-wrapper">
-            <div
-              className="home-board-preview"
-              style={{
-                transform: `perspective(600px) rotateX(${14 + tilt.y * 0.8}deg) rotateY(${-3 + tilt.x * 0.8}deg)`,
-              }}
-            >
-              {Array.from({ length: 64 }, (_, index) => {
-                const filledPositions: Record<number, string> = {
-                  1: '#f59e0b',
-                  2: '#f59e0b',
-                  9: '#f59e0b',
-                  10: '#f59e0b',
-                  18: '#06b6d4',
-                  19: '#06b6d4',
-                  26: '#06b6d4',
-                  34: '#ec4899',
-                  35: '#ec4899',
-                  36: '#ec4899',
-                  43: '#ec4899',
-                  51: '#a855f7',
-                  52: '#a855f7',
-                  53: '#a855f7',
-                }
-                const color = filledPositions[index]
-                return (
-                  <span
-                    key={index}
-                    className={`home-board-cell ${color ? 'home-board-cell--filled' : ''}`}
-                    style={
-                      color
-                        ? {
-                            backgroundColor: color,
-                            boxShadow: `0 0 14px ${color}bb, inset 0 2px 2px rgba(255, 255, 255, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.4)`,
-                          }
-                        : undefined
-                    }
-                  />
-                )
-              })}
-            </div>
-
-            {/* Repositioned Floating Chips around the board */}
-            <div className="home-floating-chips-cluster">
-              <span className="home-chip chip-top-right">Combo x3! 🔥</span>
-              <span className="home-chip chip-left-mid">Line Clear! ⚡</span>
-              <span className="home-chip chip-bottom-right">💎 +250 VeLoop Pts</span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
   )
 }
 
@@ -1102,6 +933,22 @@ function App() {
           onPlay={startNewGame}
           currentUser={currentUser}
           levelInfo={playerLevelInfo}
+          onOpenLeaderboard={() => {
+            navigate('/leaderboard')
+            playSound('buttonClick')
+          }}
+          onOpenDashboard={() => {
+            navigate('/dashboard')
+            playSound('buttonClick')
+          }}
+          onOpenChallenge={() => {
+            navigate('/challenges')
+            playSound('buttonClick')
+          }}
+          onOpenAchievements={() => {
+            navigate('/achievements')
+            playSound('buttonClick')
+          }}
         />
       ) : (
         <div className="widescreen-arena-wrapper">
