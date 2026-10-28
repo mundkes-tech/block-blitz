@@ -80,5 +80,5 @@ export async function initializeDatabase(pool: Pool | null): Promise<void> {
   }
 
   await pool.query(MIGRATIONS_SCHEMA)
-  await pool.query(CLEAN_MOCK_DEMO_USERS).catch(() => {})
+  await pool.query(CLEAN_MOCK_DEMO_USERS).catch(() => { })
 }

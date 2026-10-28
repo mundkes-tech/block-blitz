@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { login, register } from '../services/authApi'
 import type { UserProfile } from '../services/gameSessionsApi'
 
@@ -21,6 +21,18 @@ export function AuthModal({
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -61,22 +73,35 @@ export function AuthModal({
   }
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
-      <div className="modal-card auth-card">
+    <div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="auth-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="modal-card auth-card animate-scale-up">
         <header className="modal-header">
           <div className="modal-title-group">
-            <span className="eyebrow">PLAYER AUTHENTICATION</span>
+            <span className="eyebrow">PLAYER IDENTITY</span>
             <h2 id="auth-modal-title">
-              {mode === 'login' ? '🔐 SIGN IN TO PLAY' : '⚡ CREATE PLAYER ACCOUNT'}
+              {mode === 'login' ? '🔐 SIGN IN' : '⚡ REGISTER BLITZER'}
             </h2>
           </div>
-          <button className="icon-close-btn" type="button" onClick={onClose} aria-label="Close modal">
+          <button
+            className="icon-close-btn"
+            type="button"
+            onClick={onClose}
+            aria-label="Close authentication modal"
+          >
             ✕
           </button>
         </header>
 
         {/* Tab switcher: Login / Register */}
-        <div className="auth-tabs" role="tablist">
+        <div className="auth-tabs" role="tablist" aria-label="Authentication modes">
           <button
             type="button"
             role="tab"
@@ -99,92 +124,87 @@ export function AuthModal({
               setError(null)
             }}
           >
-            Create Account
+            Register Account
           </button>
         </div>
 
         {error && (
-          <div className="auth-error-banner" role="alert">
-            <span className="auth-error-icon">⚠️</span>
+          <div className="auth-error-banner animate-fade-in" role="alert">
+            <span aria-hidden="true">⚠️</span>
             <span>{error}</span>
           </div>
         )}
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {mode === 'register' && (
-            <div className="auth-input-group">
+            <div className="form-group">
               <label htmlFor="auth-name">Player Name / Handle</label>
               <input
                 id="auth-name"
                 type="text"
-                placeholder="e.g. MasterBlaster"
+                autoComplete="nickname"
+                placeholder="e.g. NeonStriker"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                maxLength={30}
                 required
-                autoComplete="nickname"
-                disabled={loading}
+                maxLength={30}
               />
             </div>
           )}
 
-          <div className="auth-input-group">
+          <div className="form-group">
             <label htmlFor="auth-email">Email Address</label>
             <input
               id="auth-email"
               type="email"
-              placeholder="you@domain.com"
+              autoComplete="email"
+              placeholder="player@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              autoComplete="email"
-              disabled={loading}
             />
           </div>
 
-          <div className="auth-input-group">
-            <label htmlFor="auth-password">Password</label>
+          <div className="form-group">
+            <label htmlFor="auth-password">Password (min 6 characters)</label>
             <input
               id="auth-password"
               type="password"
-              placeholder="Minimum 6 characters"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              disabled={loading}
             />
           </div>
 
-          <p className="auth-disclaimer">
-            {mode === 'login'
-              ? 'Sign in to access your personal high scores, game history, and rank on the live leaderboard.'
-              : 'Creating an account saves all your achievements, high scores, and stats permanently.'}
-          </p>
+          <button
+            type="submit"
+            className="primary-button btn-large w-full mt-4"
+            disabled={loading}
+          >
+            {loading ? 'Authenticating…' : mode === 'login' ? 'Sign In to Play' : 'Create Blitzer Account'}
+          </button>
+        </form>
 
-          <footer className="auth-modal-footer">
+        <footer className="auth-footer">
+          <p className="auth-hint">
+            {mode === 'login'
+              ? "Don't have an account yet? "
+              : 'Already have an existing profile? '}
             <button
               type="button"
-              className="secondary-btn"
-              onClick={onClose}
-              disabled={loading}
+              className="auth-switch-link"
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login')
+                setError(null)
+              }}
             >
-              Cancel
+              {mode === 'login' ? 'Register here' : 'Sign in'}
             </button>
-            <button
-              type="submit"
-              className="primary-button auth-submit-btn"
-              disabled={loading}
-            >
-              {loading
-                ? 'Processing…'
-                : mode === 'login'
-                  ? 'Sign In'
-                  : 'Register Account'}
-            </button>
-          </footer>
-        </form>
+          </p>
+        </footer>
       </div>
     </div>
   )

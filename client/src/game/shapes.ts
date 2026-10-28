@@ -6,10 +6,21 @@ export type BlockCoordinate = {
   col: number
 }
 
+export type BlockPattern =
+  | 'dots'
+  | 'stripes-diag'
+  | 'grid'
+  | 'cross'
+  | 'rings'
+  | 'diamond'
+  | 'spark'
+  | 'stripes-h'
+
 export type BlockShape = {
   id: string
   name: string
   color: string
+  pattern?: BlockPattern
   cells: BlockCoordinate[]
 }
 
@@ -19,23 +30,26 @@ export type Piece = {
 }
 
 export const BLOCK_SHAPES: BlockShape[] = [
-  { id: 'single', name: 'Single', color: '#f59e0b', cells: [{ row: 0, col: 0 }] },
+  { id: 'single', name: 'Single', color: '#e69f00', pattern: 'dots', cells: [{ row: 0, col: 0 }] },
   {
     id: 'line-2',
     name: 'Two line',
-    color: '#06b6d4',
+    color: '#56b4e9',
+    pattern: 'stripes-diag',
     cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
   },
   {
     id: 'line-3',
     name: 'Three line',
-    color: '#0ea5e9',
+    color: '#009e73',
+    pattern: 'grid',
     cells: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }],
   },
   {
     id: 'line-4',
     name: 'Four line',
-    color: '#3b82f6',
+    color: '#0072b2',
+    pattern: 'rings',
     cells: [
       { row: 0, col: 0 },
       { row: 0, col: 1 },
@@ -46,7 +60,8 @@ export const BLOCK_SHAPES: BlockShape[] = [
   {
     id: 'line-5',
     name: 'Five line',
-    color: '#6366f1',
+    color: '#cc79a7',
+    pattern: 'spark',
     cells: [
       { row: 0, col: 0 },
       { row: 0, col: 1 },
@@ -58,13 +73,15 @@ export const BLOCK_SHAPES: BlockShape[] = [
   {
     id: 'vertical-3',
     name: 'Vertical three',
-    color: '#8b5cf6',
+    color: '#56b4e9',
+    pattern: 'stripes-diag',
     cells: [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 2, col: 0 }],
   },
   {
     id: 'square',
     name: 'Square',
-    color: '#eab308',
+    color: '#f0e442',
+    pattern: 'cross',
     cells: [
       { row: 0, col: 0 },
       { row: 0, col: 1 },
@@ -75,13 +92,15 @@ export const BLOCK_SHAPES: BlockShape[] = [
   {
     id: 'l-3',
     name: 'Small L',
-    color: '#ec4899',
+    color: '#d55e00',
+    pattern: 'diamond',
     cells: [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
   },
   {
     id: 'l-4',
     name: 'L',
-    color: '#f97316',
+    color: '#d55e00',
+    pattern: 'diamond',
     cells: [
       { row: 0, col: 0 },
       { row: 1, col: 0 },
@@ -92,7 +111,8 @@ export const BLOCK_SHAPES: BlockShape[] = [
   {
     id: 't-4',
     name: 'T',
-    color: '#a855f7',
+    color: '#cc79a7',
+    pattern: 'spark',
     cells: [
       { row: 0, col: 0 },
       { row: 0, col: 1 },
@@ -103,7 +123,8 @@ export const BLOCK_SHAPES: BlockShape[] = [
   {
     id: 'z-4',
     name: 'Z',
-    color: '#10b981',
+    color: '#22d3ee',
+    pattern: 'stripes-h',
     cells: [
       { row: 0, col: 0 },
       { row: 0, col: 1 },
@@ -114,7 +135,8 @@ export const BLOCK_SHAPES: BlockShape[] = [
   {
     id: 'plus-5',
     name: 'Plus',
-    color: '#14b8a6',
+    color: '#009e73',
+    pattern: 'grid',
     cells: [
       { row: 0, col: 1 },
       { row: 1, col: 0 },

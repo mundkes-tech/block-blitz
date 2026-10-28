@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import GameBoard, {
   type BoardEffect,
@@ -10,6 +10,7 @@ import { FloatingScores, type ScorePopup } from './components/FloatingScores'
 import { ParticleCanvas, type ParticleTrigger } from './components/ParticleCanvas'
 import { ConfettiCanvas } from './components/ConfettiCanvas'
 import { DesktopSidebarLeft } from './components/DesktopSidebarLeft'
+import { DesktopSidebarRight, type MatchLogEntry } from './components/DesktopSidebarRight'
 import { LeaderboardModal } from './components/LeaderboardModal'
 import { PlayerDashboardModal } from './components/PlayerDashboardModal'
 import { DailyChallengeModal } from './components/DailyChallengeModal'
@@ -20,7 +21,8 @@ import { HomeScreen } from './components/HomeScreen'
 import { BOARD_SIZE, createEmptyBoard, type Board } from './game/board'
 import { clearCompletedLines } from './game/lines'
 import { canPlaceShape, placeShape } from './game/placement'
-import { generatePieces, type Piece } from './game/shapes'
+import { generatePieces, type BlockPattern, type Piece } from './game/shapes'
+import { AnimatedNumber } from './ui/primitives'
 import { isGameOver } from './game/gameOver'
 import {
   calculatePlacementScore,
@@ -38,20 +40,24 @@ import {
   type UserProfile,
 } from './services/gameSessionsApi'
 import { fetchMe, logout, getStoredUser } from './services/authApi'
+import './styles/design-tokens.css'
 import './App.css'
+import './styles/redesign.css'
 
 type ActiveDrag = {
   piece: Piece
   pointerId: number
-  isTouch: boolean
+  isTouch?: boolean
 }
 
 type GamePhase = 'home' | 'playing' | 'gameOver'
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'unavailable'
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'unavailable' | 'error'
 
 type BoardSnapshot = {
   board: Board
   boardColors: (string | null)[][]
+  boardPatterns: (BlockPattern | null)[][]
   pieces: Piece[]
   score: number
   combo: number
@@ -61,33 +67,27 @@ type BoardSnapshot = {
 }
 
 const BEST_SCORE_KEY = 'block-blitz-best-score'
+const THEME_KEY = 'block-blitz-theme'
 const SOUND_ENABLED_KEY = 'block-blitz-sound-enabled'
 const MUSIC_ENABLED_KEY = 'block-blitz-music-enabled'
-const THEME_KEY = 'block-blitz-theme'
-const USER_ID_KEY = 'block-blitz-active-user-id'
 
-function readBestScore(): number {
+function readStoredBestScore(): number {
   try {
     const raw = window.localStorage.getItem(BEST_SCORE_KEY)
-    if (!raw) return 0
-    const stored = Number.parseInt(raw, 10)
-    // Clear legacy mock demo score 8420
-    if (stored === 8420) {
-      window.localStorage.removeItem(BEST_SCORE_KEY)
-      return 0
-    }
-    return Number.isFinite(stored) && stored >= 0 ? stored : 0
+    const parsed = Number(raw)
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
   } catch {
     return 0
   }
 }
 
-function readStoredBool(key: string, fallback: boolean): boolean {
+function readStoredBool(key: string, defaultValue: boolean): boolean {
   try {
-    const val = window.localStorage.getItem(key)
-    return val !== null ? val === 'true' : fallback
+    const raw = window.localStorage.getItem(key)
+    if (raw === null) return defaultValue
+    return raw === 'true'
   } catch {
-    return fallback
+    return defaultValue
   }
 }
 
@@ -97,44 +97,48 @@ function createEmptyColorBoard(): (string | null)[][] {
   )
 }
 
+function createEmptyPatternBoard(): (BlockPattern | null)[][] {
+  return Array.from({ length: BOARD_SIZE }, () =>
+    Array.from({ length: BOARD_SIZE }, () => null),
+  )
+}
+
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
-  const baseRouteRef = useRef<string>('/')
+
   const [phase, setPhase] = useState<GamePhase>('home')
   const [board, setBoard] = useState<Board>(createEmptyBoard)
   const [boardColors, setBoardColors] = useState<(string | null)[][]>(createEmptyColorBoard)
+  const [boardPatterns, setBoardPatterns] = useState<(BlockPattern | null)[][]>(createEmptyPatternBoard)
   const [pieces, setPieces] = useState<Piece[]>(() => generatePieces(3))
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
-  const [bestScore, setBestScore] = useState<number>(() => {
-    const user = getStoredUser()
-    if (user) {
-      return user.highestScore ?? 0
-    }
-    return readBestScore()
-  })
   const [totalLinesCleared, setTotalLinesCleared] = useState(0)
   const [blocksPlaced, setBlocksPlaced] = useState(0)
+  const [bestScore, setBestScore] = useState(readStoredBestScore)
   const [highestCombo, setHighestCombo] = useState(0)
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [isNewBest, setIsNewBest] = useState(false)
-  const [, setSaveStatus] = useState<SaveStatus>('idle')
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null)
   const [shakeBoard, setShakeBoard] = useState(false)
   const [preview, setPreview] = useState<BoardPreview | null>(null)
   const [activeDragPieceId, setActiveDragPieceId] = useState<string | null>(null)
+  const [returningPieceId, setReturningPieceId] = useState<string | null>(null)
   const [popups, setPopups] = useState<ScorePopup[]>([])
   const [particleTrigger, setParticleTrigger] = useState<ParticleTrigger | null>(null)
+  const [liveAnnounce, setLiveAnnounce] = useState('')
+  const [matchLogs, setMatchLogs] = useState<MatchLogEntry[]>([])
 
-  // Power-Ups State (Section 47 Bonus Features)
+  // Power-Ups State
   const [rerollsLeft, setRerollsLeft] = useState(1)
   const [hammersLeft, setHammersLeft] = useState(1)
   const [undosLeft, setUndosLeft] = useState(1)
   const [hammerActive, setHammerActive] = useState(false)
   const [undoHistory, setUndoHistory] = useState<BoardSnapshot[]>([])
 
-  // Achievements & Confetti State (Section 47 Bonus Features)
+  // Achievements & Confetti State
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>(readUnlockedAchievements)
   const [achievementToast, setAchievementToast] = useState<{ title: string; icon: string } | null>(null)
   const [isConfettiActive, setIsConfettiActive] = useState(false)
@@ -158,40 +162,14 @@ function App() {
   const isAuthOpen = location.pathname === '/login' || location.pathname === '/register'
   const authInitialMode: 'login' | 'register' = location.pathname === '/register' ? 'register' : 'login'
 
-  const openAuth = (mode: 'login' | 'register' = 'login') => {
-    playSound('buttonClick')
-    navigate(mode === 'register' ? '/register' : '/login')
-  }
-
-  const handleLogout = async () => {
-    await logout()
-    setCurrentUser(null)
-    setBestScore(0)
-    window.localStorage.removeItem(BEST_SCORE_KEY)
-    playSound('buttonClick')
-  }
-
-  const handleAuthSuccess = (user: UserProfile) => {
-    setCurrentUser(user)
-    setBestScore(user.highestScore ?? 0)
-    window.localStorage.setItem(BEST_SCORE_KEY, String(user.highestScore ?? 0))
-    playSound('buttonClick')
-    navigate(baseRouteRef.current)
-  }
-
-  const closeModal = () => {
-    playSound('buttonClick')
-    navigate(baseRouteRef.current)
-  }
-
-  const boardRef = useRef<HTMLDivElement>(null)
   const activeDragRef = useRef<ActiveDrag | null>(null)
   const previewRef = useRef<BoardPreview | null>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
   const soundEffectsRef = useRef<SoundEffects | null>(null)
-  const gameTokenRef = useRef(0)
   const sessionIdRef = useRef<string | null>(null)
   const sessionCompletionSubmittedRef = useRef(false)
-  const timerIntervalRef = useRef<number | null>(null)
+  const gameTokenRef = useRef(0)
+  const baseRouteRef = useRef('/')
 
   const gameStatsRef = useRef({
     score: 0,
@@ -202,114 +180,121 @@ function App() {
     ended: false,
   })
 
-  // Player Level & XP
-  const careerLines = (currentUser?.totalLinesCleared ?? 0) + totalLinesCleared
-  const careerBlocks = blocksPlaced + (currentUser?.totalGames ?? 0) * 20
-  const careerScore = currentUser ? (currentUser.highestScore ?? 0) : bestScore
-  const totalXP = careerLines * 50 + careerBlocks * 5 + Math.round(careerScore * 0.1)
-  const playerLevelInfo = calculatePlayerLevel(totalXP)
+  // Dynamic Level & XP
+  const playerLevelInfo = calculatePlayerLevel(score)
 
-  // Check active authentication session
+  // Sound manager lifecycle
+  useEffect(() => {
+    const sound = new SoundEffects()
+    soundEffectsRef.current = sound
+    return () => {
+      sound.dispose()
+      soundEffectsRef.current = null
+    }
+  }, [])
+
+  const playSound = useCallback((effect: Parameters<SoundEffects['play']>[0], comboLevel = 1) => {
+    if (!soundEnabled) return
+    soundEffectsRef.current?.play(effect, comboLevel)
+  }, [soundEnabled])
+
+  // Sync auth state on mount
   useEffect(() => {
     fetchMe()
       .then((user) => {
         if (user) {
           setCurrentUser(user)
-          setBestScore(user.highestScore ?? 0)
-          window.localStorage.setItem(BEST_SCORE_KEY, String(user.highestScore ?? 0))
+          if (user.highestScore > bestScore) {
+            setBestScore(user.highestScore)
+          }
         }
       })
       .catch(() => {})
-  }, [])
-
-  // Save preferences
-  useEffect(() => {
-    window.localStorage.setItem(BEST_SCORE_KEY, String(bestScore))
   }, [bestScore])
 
+  // Persistence: Best Score
   useEffect(() => {
-    window.localStorage.setItem(SOUND_ENABLED_KEY, String(soundEnabled))
+    try {
+      window.localStorage.setItem(BEST_SCORE_KEY, String(bestScore))
+    } catch {
+      // Storage quota or privacy mode
+    }
+  }, [bestScore])
+
+  // Persistence: Theme
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_KEY, theme)
+    } catch {
+      // Storage quota or privacy mode
+    }
+  }, [theme])
+
+  // Persistence: Sound FX
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SOUND_ENABLED_KEY, String(soundEnabled))
+    } catch {
+      // Storage quota or privacy mode
+    }
   }, [soundEnabled])
 
+  // Persistence: Music
   useEffect(() => {
-    window.localStorage.setItem(MUSIC_ENABLED_KEY, String(musicEnabled))
-    if (musicEnabled) {
+    try {
+      window.localStorage.setItem(MUSIC_ENABLED_KEY, String(musicEnabled))
+    } catch {
+      // Storage quota or privacy mode
+    }
+
+    if (musicEnabled && phase === 'playing') {
       soundEffectsRef.current?.startBgm()
     } else {
       soundEffectsRef.current?.stopBgm()
     }
-  }, [musicEnabled])
+  }, [musicEnabled, phase])
 
-  useEffect(() => {
-    window.localStorage.setItem(THEME_KEY, theme)
-  }, [theme])
-
-  useEffect(() => {
-    if (currentUserId) {
-      window.localStorage.setItem(USER_ID_KEY, currentUserId)
-    } else {
-      window.localStorage.removeItem(USER_ID_KEY)
-    }
-  }, [currentUserId])
-
-  // Clear board effects after animation
-  useEffect(() => {
-    if (!boardEffect) return
-    const timeoutId = window.setTimeout(() => {
-      setBoardEffect(null)
-      setShakeBoard(false)
-    }, 450)
-    return () => window.clearTimeout(timeoutId)
-  }, [boardEffect])
-
-  // Clear popups after animation
+  // Auto-dismiss score popups
   useEffect(() => {
     if (popups.length === 0) return
     const timeoutId = window.setTimeout(() => {
       setPopups([])
-    }, 1200)
+    }, 900)
     return () => window.clearTimeout(timeoutId)
   }, [popups])
+
+  // Escape key cancels hammer targeting
+  useEffect(() => {
+    if (!hammerActive) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setHammerActive(false)
+        setLiveAnnounce('Hammer mode cancelled.')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hammerActive])
+
+  // Reset returning piece after animation
+  useEffect(() => {
+    if (!returningPieceId) return
+    const timer = window.setTimeout(() => setReturningPieceId(null), 240)
+    return () => window.clearTimeout(timer)
+  }, [returningPieceId])
 
   // Match timer
   useEffect(() => {
     if (phase === 'playing') {
-      timerIntervalRef.current = window.setInterval(() => {
-        setDurationSeconds((sec) => {
-          const next = sec + 1
-          gameStatsRef.current.duration = next
-          return next
-        })
+      const interval = window.setInterval(() => {
+        setDurationSeconds((sec) => sec + 1)
       }, 1000)
-    } else if (timerIntervalRef.current !== null) {
-      window.clearInterval(timerIntervalRef.current)
-      timerIntervalRef.current = null
-    }
-
-    return () => {
-      if (timerIntervalRef.current !== null) {
-        window.clearInterval(timerIntervalRef.current)
-      }
+      return () => window.clearInterval(interval)
     }
   }, [phase])
 
-  // Cleanup audio
-  useEffect(() => () => soundEffectsRef.current?.dispose(), [])
-
-  const lastButtonClickTimeRef = useRef(0)
-
-  const playSound = (effect: Parameters<SoundEffects['play']>[0], level = 1) => {
-    if (!soundEnabled) return
-    if (effect === 'buttonClick') {
-      const now = Date.now()
-      if (now - lastButtonClickTimeRef.current < 75) return
-      lastButtonClickTimeRef.current = now
-    }
-    soundEffectsRef.current ??= new SoundEffects()
-    soundEffectsRef.current.play(effect, level)
-  }
-
-  // Global sound listener: plays click sound on ANY button click across the application
+  // Global button click audio
   useEffect(() => {
     const handleGlobalButtonClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
@@ -320,9 +305,14 @@ function App() {
     }
     window.addEventListener('click', handleGlobalButtonClick, { capture: true })
     return () => window.removeEventListener('click', handleGlobalButtonClick, { capture: true })
-  }, [soundEnabled])
+  }, [playSound])
 
-  const addMatchLog = (_text?: string, _subtext?: string, _color?: string) => {}
+  const addMatchLog = useCallback((text: string, subtext?: string, color?: string) => {
+    setMatchLogs((prev) => [
+      { id: Date.now() + Math.random(), text, subtext, color },
+      ...prev.slice(0, 15),
+    ])
+  }, [])
 
   const checkAndUnlock = (id: string, title: string, icon: string) => {
     setUnlockedAchievements((prev) => {
@@ -333,11 +323,12 @@ function App() {
       playSound('achievement')
       window.setTimeout(() => setAchievementToast(null), 3500)
       addMatchLog('🎖️ Badge Unlocked!', title, '#facc15')
+      setLiveAnnounce(`Achievement unlocked: ${title}`)
       return next
     })
   }
 
-  const submitSessionResult = (token: number) => {
+  const submitSessionResult = (token: number, forceRetry = false) => {
     const sessionId = sessionIdRef.current
     const stats = gameStatsRef.current
 
@@ -345,7 +336,7 @@ function App() {
       token !== gameTokenRef.current ||
       !sessionId ||
       !stats.ended ||
-      sessionCompletionSubmittedRef.current
+      (sessionCompletionSubmittedRef.current && !forceRetry)
     ) {
       return
     }
@@ -361,142 +352,134 @@ function App() {
       stats.highestCombo,
       stats.duration,
     )
-      .then(() => {
-        if (token === gameTokenRef.current) {
+      .then((completedData) => {
+        if (completedData) {
+          setSaveStatus('saved')
+          setLiveAnnounce('Match score successfully saved to leaderboard.')
+        } else {
           setSaveStatus('saved')
         }
       })
-      .catch(() => {
-        if (token === gameTokenRef.current) {
-          setSaveStatus('unavailable')
-        }
+      .catch((err) => {
+        const isOffline =
+          err instanceof Error &&
+          (err.message.includes('unavailable') ||
+            err.message.includes('Failed to fetch') ||
+            err.message.includes('NetworkError'))
+        setSaveStatus(isOffline ? 'unavailable' : 'error')
+        setLiveAnnounce('Could not save score to server. Saved locally.')
       })
   }
 
-  const createSessionForGame = (token: number) => {
-    setSaveStatus('saving')
-    createGameSession(currentUserId || undefined)
-      .then((sessionId) => {
+  const retrySaveSession = () => {
+    submitSessionResult(gameTokenRef.current, true)
+  }
+
+  const createSessionForGame = useCallback((token: number) => {
+    createGameSession(currentUserId ?? undefined)
+      .then((createdSessionId) => {
         if (token !== gameTokenRef.current) return
-        sessionIdRef.current = sessionId
-        setSaveStatus(gameStatsRef.current.ended ? 'saving' : 'saved')
-        submitSessionResult(token)
+        sessionIdRef.current = createdSessionId
+        setSaveStatus('idle')
       })
       .catch(() => {
-        if (token === gameTokenRef.current) {
-          setSaveStatus('unavailable')
-        }
+        if (token !== gameTokenRef.current) return
+        sessionIdRef.current = null
+        setSaveStatus('unavailable')
       })
-  }
+  }, [currentUserId])
 
-  // Power-Ups logic
   const handleUseReroll = () => {
     if (rerollsLeft <= 0 || phase !== 'playing') return
-    const newPieces = generatePieces(3, Math.random, board)
-    setPieces(newPieces)
-    setRerollsLeft((prev) => prev - 1)
+    const nextPieces = generatePieces(3, Math.random, board)
+    setPieces(nextPieces)
+    setRerollsLeft((r) => r - 1)
     playSound('buttonClick')
-    addMatchLog('🔄 Reroll Used', 'New pieces drawn', '#06b6d4')
-    checkAndUnlock('reroll_used', 'Tactician', '🔄')
+    addMatchLog('🔄 Reroll Used', 'New piece set deal', '#38bdf8')
+    setLiveAnnounce('Reroll used. Fresh blocks dealt.')
   }
 
   const handleToggleHammer = () => {
     if (hammersLeft <= 0 || phase !== 'playing') return
-    setHammerActive((prev) => !prev)
+    const nextState = !hammerActive
+    setHammerActive(nextState)
     playSound('buttonClick')
+    if (nextState) {
+      setLiveAnnounce('Hammer mode active. Tap an occupied block to clear.')
+    } else {
+      setLiveAnnounce('Hammer mode cancelled.')
+    }
   }
 
-  const handleCellClick = (r: number, c: number) => {
-    if (!hammerActive || !board[r][c] || hammersLeft <= 0) return
+  const handleUseUndo = () => {
+    if (undoHistory.length === 0 || undosLeft <= 0 || phase !== 'playing') return
+    const previous = undoHistory[undoHistory.length - 1]
+    const remainingHistory = undoHistory.slice(0, -1)
 
-    // Save snapshot for undo
-    setUndoHistory((prev) => [
-      ...prev,
-      {
-        board: board.map((row) => [...row]),
-        boardColors: boardColors.map((row) => [...row]),
-        pieces,
-        score,
-        combo,
-        linesCleared: totalLinesCleared,
-        blocksPlaced,
-        highestCombo,
-      },
-    ])
+    setBoard(previous.board)
+    setBoardColors(previous.boardColors)
+    setBoardPatterns(previous.boardPatterns)
+    setPieces(previous.pieces)
+    setScore(previous.score)
+    setCombo(previous.combo)
+    setTotalLinesCleared(previous.linesCleared)
+    setBlocksPlaced(previous.blocksPlaced)
+    setHighestCombo(previous.highestCombo)
+    setUndoHistory(remainingHistory)
+    setUndosLeft((u) => u - 1)
+    playSound('buttonClick')
+    addMatchLog('↩️ Move Undone', 'Board snapshot restored', '#a78bfa')
+    setLiveAnnounce('Previous move undone.')
+  }
 
-    const nextBoard = board.map((row) => [...row])
-    const nextBoardColors = boardColors.map((row) => [...row])
-    const smashedColor = boardColors[r][c] ?? '#f59e0b'
+  const handleCellClick = (row: number, col: number) => {
+    if (!hammerActive || !board[row]?.[col] || hammersLeft <= 0) return
 
-    nextBoard[r][c] = false
-    nextBoardColors[r][c] = null
+    const nextBoard = board.map((r, rIdx) =>
+      r.map((cell, cIdx) => (rIdx === row && cIdx === col ? false : cell)),
+    )
+    const nextColors = boardColors.map((r, rIdx) =>
+      r.map((color, cIdx) => (rIdx === row && cIdx === col ? null : color)),
+    )
+    const nextPatterns = boardPatterns.map((r, rIdx) =>
+      r.map((pattern, cIdx) => (rIdx === row && cIdx === col ? null : pattern)),
+    )
 
-    setBoard(nextBoard)
-    setBoardColors(nextBoardColors)
-    setHammersLeft((prev) => prev - 1)
-    setHammerActive(false)
-    gameStatsRef.current = {
-      ...gameStatsRef.current,
-      score,
-      linesCleared: totalLinesCleared,
-      blocksPlaced,
-      highestCombo,
-    }
-    playSound('lineClear')
-
-    // Trigger particle blast on smashed cell
     if (boardRef.current) {
       const bounds = boardRef.current.getBoundingClientRect()
       const cellSize = bounds.width / BOARD_SIZE
       setParticleTrigger({
         id: Date.now(),
-        cells: [{ x: (c + 0.5) * cellSize, y: (r + 0.5) * cellSize, color: smashedColor }],
+        cells: [
+          {
+            x: (col + 0.5) * cellSize,
+            y: (row + 0.5) * cellSize,
+            color: boardColors[row][col] || '#f59e0b',
+          },
+        ],
       })
     }
 
-    addMatchLog('🔨 Hammer Smash!', 'Block cleared', '#f43f5e')
-    checkAndUnlock('hammer_used', 'Demolitionist', '🔨')
+    setBoard(nextBoard)
+    setBoardColors(nextColors)
+    setBoardPatterns(nextPatterns)
+    setHammersLeft((h) => h - 1)
+    setHammerActive(false)
+    playSound('lineClear')
+    addMatchLog('🔨 Hammer Smash', `Cleared block at (${row + 1}, ${col + 1})`, '#ef4444')
+    setLiveAnnounce(`Hammer smashed block at row ${row + 1}, column ${col + 1}.`)
   }
 
-  const handleUseUndo = () => {
-    if (undosLeft <= 0 || undoHistory.length === 0 || phase !== 'playing') return
-    const lastSnapshot = undoHistory[undoHistory.length - 1]
-    setUndoHistory((prev) => prev.slice(0, prev.length - 1))
+  const updatePreview = (piece: Piece, clientX: number, clientY: number) => {
+    const boardEl = boardRef.current
+    if (!boardEl) return
 
-    setBoard(lastSnapshot.board)
-    setBoardColors(lastSnapshot.boardColors)
-    setPieces(lastSnapshot.pieces)
-    setScore(lastSnapshot.score)
-    setCombo(lastSnapshot.combo)
-    setTotalLinesCleared(lastSnapshot.linesCleared)
-    setBlocksPlaced(lastSnapshot.blocksPlaced)
-    setHighestCombo(lastSnapshot.highestCombo)
-    gameStatsRef.current = {
-      ...gameStatsRef.current,
-      score: lastSnapshot.score,
-      linesCleared: lastSnapshot.linesCleared,
-      blocksPlaced: lastSnapshot.blocksPlaced,
-      highestCombo: lastSnapshot.highestCombo,
-    }
-    setUndosLeft((prev) => prev - 1)
-    playSound('buttonClick')
-    addMatchLog('↩️ Move Undone', 'Reverted previous state', '#a855f7')
-  }
-
-  const updatePreview = (
-    piece: Piece,
-    clientX: number,
-    clientY: number,
-  ) => {
-    const boardElement = boardRef.current
-    if (!boardElement) return
-
-    const bounds = boardElement.getBoundingClientRect()
-    const styles = getComputedStyle(boardElement)
-    const paddingLeft = Number.parseFloat(styles.paddingLeft)
-    const paddingRight = Number.parseFloat(styles.paddingRight)
-    const paddingTop = Number.parseFloat(styles.paddingTop)
-    const paddingBottom = Number.parseFloat(styles.paddingBottom)
+    const bounds = boardEl.getBoundingClientRect()
+    const styles = window.getComputedStyle(boardEl)
+    const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0
+    const paddingRight = Number.parseFloat(styles.paddingRight) || 0
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0
+    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0
     const gap = Number.parseFloat(styles.columnGap || styles.gap || '0')
     const contentWidth = bounds.width - paddingLeft - paddingRight
     const contentHeight = bounds.height - paddingTop - paddingBottom
@@ -544,7 +527,7 @@ function App() {
     setActiveDragPieceId(piece.id)
     playSound('blockPick')
 
-    // Section 10 & 39: On mobile touch, lift preview upward so thumb doesn't obscure the placement
+    // On mobile touch, lift preview upward so thumb doesn't obscure the placement
     const dragY = isTouch ? event.clientY - 65 : event.clientY
     updatePreview(piece, event.clientX, dragY)
   }
@@ -557,11 +540,19 @@ function App() {
     }
   }
 
-  const clearDrag = () => {
+  const clearDrag = useCallback(() => {
     activeDragRef.current = null
     previewRef.current = null
     setActiveDragPieceId(null)
     setPreview(null)
+  }, [])
+
+  const handlePointerCancel = (event: PointerEvent<HTMLDivElement>) => {
+    const activeDrag = activeDragRef.current
+    if (activeDrag && activeDrag.pointerId === event.pointerId) {
+      setReturningPieceId(activeDrag.piece.id)
+      clearDrag()
+    }
   }
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
@@ -575,8 +566,9 @@ function App() {
       setUndoHistory((prev) => [
         ...prev.slice(-3),
         {
-          board: board.map((row) => [...row]),
-          boardColors: boardColors.map((row) => [...row]),
+          board: board.map((r) => [...r]),
+          boardColors: boardColors.map((r) => [...r]),
+          boardPatterns: boardPatterns.map((r) => [...r]),
           pieces,
           score,
           combo,
@@ -593,11 +585,14 @@ function App() {
         currentPreview.col,
       )
 
-      // Record block colors onto the board
+      // Record block colors and patterns onto the board
       const nextBoardColors = boardColors.map((r) => [...r])
+      const nextBoardPatterns = boardPatterns.map((r) => [...r])
       activeDrag.piece.shape.cells.forEach((cell) => {
-        nextBoardColors[currentPreview.row + cell.row][currentPreview.col + cell.col] =
-          activeDrag.piece.shape.color
+        const r = currentPreview.row + cell.row
+        const c = currentPreview.col + cell.col
+        nextBoardColors[r][c] = activeDrag.piece.shape.color
+        nextBoardPatterns[r][c] = activeDrag.piece.shape.pattern || null
       })
 
       const cleared = clearCompletedLines(placedBoard)
@@ -630,12 +625,18 @@ function App() {
         setParticleTrigger({ id: Date.now(), cells: particlesToSpawn })
       }
 
-      // Clear colors for cleared rows and columns
+      // Clear colors and patterns for cleared rows and columns
       cleared.clearedRows.forEach((r) => {
-        for (let c = 0; c < BOARD_SIZE; c++) nextBoardColors[r][c] = null
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          nextBoardColors[r][c] = null
+          nextBoardPatterns[r][c] = null
+        }
       })
       cleared.clearedColumns.forEach((c) => {
-        for (let r = 0; r < BOARD_SIZE; r++) nextBoardColors[r][c] = null
+        for (let r = 0; r < BOARD_SIZE; r++) {
+          nextBoardColors[r][c] = null
+          nextBoardPatterns[r][c] = null
+        }
       })
 
       const remainingPieces = pieces.filter(({ id }) => id !== activeDrag.piece.id)
@@ -658,6 +659,7 @@ function App() {
 
       setBoard(cleared.board)
       setBoardColors(nextBoardColors)
+      setBoardPatterns(nextBoardPatterns)
       setPieces(nextPieces)
       setScore(nextScore)
       setBlocksPlaced(nextBlocksPlaced)
@@ -688,13 +690,16 @@ function App() {
         checkAndUnlock('score_10k', 'Grandmaster', '👑')
       }
 
-      // Match telemetry log
+      // Match telemetry log & live announcement
       if (clearedLineCount > 1) {
         addMatchLog(`⚡ ${clearedLineCount} Lines Blast! (+${placementScore})`, `Combo x${nextCombo}`, '#ec4899')
+        setLiveAnnounce(`${clearedLineCount} lines blasted! Combo multiplier times ${nextCombo}. Score: ${nextScore}`)
       } else if (clearedLineCount === 1) {
         addMatchLog(`✨ Line Clear (+${placementScore})`, nextCombo > 1 ? `Combo x${nextCombo}` : undefined, '#06b6d4')
+        setLiveAnnounce(`Line cleared! Score: ${nextScore}`)
       } else {
         addMatchLog(`Piece Placed (+${placementScore})`, activeDrag.piece.shape.name, activeDrag.piece.shape.color)
+        setLiveAnnounce(`Piece placed. Score: ${nextScore}`)
       }
 
       // High Score check & celebration
@@ -704,6 +709,7 @@ function App() {
           playSound('newBest')
           setIsConfettiActive(true)
           window.setTimeout(() => setIsConfettiActive(false), 4500)
+          setLiveAnnounce(`New personal best record! ${nextScore} points!`)
         }
         setBestScore(nextScore)
       }
@@ -717,7 +723,7 @@ function App() {
         ended: false,
       }
 
-      // Popups
+      // Floating Popups
       const newPopups: ScorePopup[] = [
         {
           id: Date.now(),
@@ -756,10 +762,8 @@ function App() {
         setShakeBoard(true)
       }
 
-      // Audio: place sound on placing block pieces in grid
+      // Audio
       playSound('placement')
-
-      // Audio: clear sound when row or columns get clear
       if (clearedLineCount > 0) {
         window.setTimeout(() => {
           if (clearedLineCount === 1) {
@@ -781,18 +785,22 @@ function App() {
         setPhase('gameOver')
         playSound('gameOver')
         navigate('/game-over')
+        setLiveAnnounce(`Game over! No moves remaining. Final score: ${nextScore}`)
         if (isNewBest) {
           setIsConfettiActive(true)
           window.setTimeout(() => setIsConfettiActive(false), 5000)
         }
         submitSessionResult(gameTokenRef.current)
       }
+    } else {
+      // Dropped outside or invalid - trigger return animation
+      setReturningPieceId(activeDrag.piece.id)
     }
 
     clearDrag()
   }
 
-  const startNewGame = () => {
+  const startNewGame = useCallback(() => {
     clearDrag()
     gameTokenRef.current += 1
     sessionIdRef.current = null
@@ -809,6 +817,7 @@ function App() {
     const empty = createEmptyBoard()
     setBoard(empty)
     setBoardColors(createEmptyColorBoard())
+    setBoardPatterns(createEmptyPatternBoard())
     setPieces(generatePieces(3, Math.random, empty))
     setScore(0)
     setCombo(0)
@@ -829,6 +838,7 @@ function App() {
     setSaveStatus('saving')
     setPhase('playing')
     playSound('buttonClick')
+    setLiveAnnounce('New match started. Board is empty and ready.')
 
     if (musicEnabled) {
       soundEffectsRef.current?.startBgm()
@@ -838,7 +848,7 @@ function App() {
     if (location.pathname !== '/play') {
       navigate('/play')
     }
-  }
+  }, [clearDrag, musicEnabled, playSound, location.pathname, navigate, createSessionForGame])
 
   const returnHome = () => {
     clearDrag()
@@ -853,38 +863,73 @@ function App() {
     }
   }
 
-  // Sync router URL changes (browser back/forward or direct URL navigation)
+  const closeModal = () => {
+    navigate(baseRouteRef.current || '/')
+  }
+
+  const openAuth = (mode: 'login' | 'register') => {
+    navigate(mode === 'register' ? '/register' : '/login')
+  }
+
+  const handleAuthSuccess = (user: UserProfile) => {
+    setCurrentUser(user)
+    if (user.highestScore > bestScore) {
+      setBestScore(user.highestScore)
+    }
+    closeModal()
+  }
+
+  const handleLogout = () => {
+    logout().finally(() => {
+      setCurrentUser(null)
+    })
+  }
+
+  // Router URL synchronization without cascading synchronous render
   useEffect(() => {
     const current = location.pathname
     if (current === '/' || current === '/home') {
       baseRouteRef.current = '/'
       if (phase === 'playing' || phase === 'gameOver') {
-        clearDrag()
-        setBoardEffect(null)
-        setShakeBoard(false)
-        setHammerActive(false)
-        setIsConfettiActive(false)
-        setPhase('home')
+        queueMicrotask(() => {
+          clearDrag()
+          setBoardEffect(null)
+          setShakeBoard(false)
+          setHammerActive(false)
+          setIsConfettiActive(false)
+          setPhase('home')
+        })
       }
     } else if (current === '/play') {
       baseRouteRef.current = '/play'
       if (phase === 'home' || phase === 'gameOver') {
-        startNewGame()
+        queueMicrotask(() => {
+          startNewGame()
+        })
       }
     } else if (current === '/game-over') {
-      setPhase('gameOver')
+      if (phase !== 'gameOver') {
+        queueMicrotask(() => {
+          setPhase('gameOver')
+        })
+      }
     }
-  }, [location.pathname])
+  }, [location.pathname, phase, startNewGame, clearDrag])
 
   return (
     <div className={`app-root theme-${theme} phase-${phase}`}>
+      {/* Polite Accessibility Live Region */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {liveAnnounce}
+      </div>
+
       {/* Global Confetti Shower Canvas on High Score & Milestones */}
       <ConfettiCanvas active={isConfettiActive} />
 
       {/* Achievement Unlocked Toast Banner */}
       {achievementToast && (
-        <div className="achievement-toast-banner" role="alert">
-          <span className="toast-icon">{achievementToast.icon}</span>
+        <div className="achievement-toast-banner animate-slide-up" role="alert">
+          <span className="toast-icon" aria-hidden="true">{achievementToast.icon}</span>
           <div className="toast-text">
             <span className="toast-tag">ACHIEVEMENT UNLOCKED</span>
             <strong>{achievementToast.title}</strong>
@@ -930,9 +975,11 @@ function App() {
       {phase === 'home' && location.pathname !== '/play' ? (
         <HomeScreen
           bestScore={bestScore}
+          hasActiveGame={score > 0}
           totalLinesCleared={totalLinesCleared}
           unlockedBadgesCount={unlockedAchievements.length}
           onPlay={startNewGame}
+          onNewGame={startNewGame}
           currentUser={currentUser}
           levelInfo={playerLevelInfo}
           onOpenLeaderboard={() => {
@@ -954,7 +1001,7 @@ function App() {
         />
       ) : (
         <div className="widescreen-arena-wrapper">
-          {/* Column 1: Left - Tactical Boosters & Daily Challenges */}
+          {/* Zone 1: Left - Tactical Boosters & Daily Mission */}
           <DesktopSidebarLeft
             currentLinesCleared={totalLinesCleared}
             rerollsLeft={rerollsLeft}
@@ -969,125 +1016,192 @@ function App() {
               navigate('/challenges')
               playSound('buttonClick')
             }}
+            locked={phase === 'gameOver'}
           />
 
-          {/* Column 2: Center - Main Game Arena & 8x8 Board */}
-          <main className="game-shell">
-            {/* Header & Score Bar */}
-            <header className="game-hud">
+          {/* Zone 2: Center - Arena, Dominant Score HUD & 8x8 Board */}
+          <main className="game-shell" role="main">
+            {/* Dominant Telemetry HUD */}
+            <header className="game-hud" aria-label="Game telemetry">
               <div className={`hud-card hud-score${combo > 1 ? ' hud-score--combo' : ''}`}>
                 <div className="hud-label-group">
-                  <span className="hud-label">⭐ SCORE</span>
+                  <span className="hud-label">SCORE</span>
                   {combo > 1 && (
-                    <span className="hud-combo-badge pulse-combo" title={`Combo ${combo}x active`}>
-                      🔥 {combo}×
+                    <span className="hud-combo-badge pulse-combo" title={`Combo multiplier ${combo}x active`}>
+                      🔥 {combo}× COMBO
                     </span>
                   )}
                 </div>
-                <strong className="hud-value hud-value--score">{score.toLocaleString()}</strong>
+                <strong className="hud-value hud-value--score tabular-nums">
+                  <AnimatedNumber value={score} durationMs={260} />
+                </strong>
               </div>
 
               <div className="hud-card hud-best">
-                <span className="hud-label">🏆 BEST</span>
-                <strong className="hud-value">{bestScore.toLocaleString()}</strong>
+                <span className="hud-label">BEST RECORD</span>
+                <strong className="hud-value tabular-nums font-mono">
+                  {bestScore.toLocaleString()}
+                </strong>
               </div>
 
               <div className="hud-card hud-lines">
-                <span className="hud-label">⚡ LINES</span>
-                <strong className="hud-value text-teal">{totalLinesCleared}</strong>
+                <span className="hud-label">LINES</span>
+                <strong className="hud-value text-teal tabular-nums font-mono">
+                  {totalLinesCleared}
+                </strong>
+              </div>
+
+              {/* Non-blocking sync status */}
+              <div
+                className="hud-card hud-status"
+                title={
+                  saveStatus === 'saving'
+                    ? 'Syncing result with server…'
+                    : saveStatus === 'saved'
+                      ? 'Score saved to server'
+                      : saveStatus === 'unavailable'
+                        ? 'Operating in local offline mode'
+                        : 'Sync status'
+                }
+              >
+                <span className="hud-label">STATUS</span>
+                <span className={`save-status-pill save-status-pill--${saveStatus}`}>
+                  {saveStatus === 'saving' && '● Syncing'}
+                  {saveStatus === 'saved' && '✓ Synced'}
+                  {saveStatus === 'unavailable' && 'Local Only'}
+                  {saveStatus === 'error' && '⚠️ Failed'}
+                  {saveStatus === 'idle' && 'Ready'}
+                </span>
               </div>
             </header>
 
             {/* Hammer active mode banner */}
             {hammerActive && (
-              <div className="hammer-active-banner" role="status">
-                <span className="hammer-banner-icon">🔨</span>
-                <span className="hammer-banner-text">HAMMER ACTIVE: Tap a block to smash!</span>
+              <div className="hammer-active-banner animate-pulse" role="status">
+                <span className="hammer-banner-icon" aria-hidden="true">🔨</span>
+                <span className="hammer-banner-text">
+                  HAMMER ACTIVE: Tap any occupied block on the grid to shatter it!
+                </span>
                 <button
                   type="button"
                   className="hammer-banner-cancel-btn"
-                  onClick={() => setHammerActive(false)}
-                  title="Cancel Hammer"
+                  onClick={() => {
+                    setHammerActive(false)
+                    setLiveAnnounce('Hammer mode cancelled.')
+                  }}
+                  title="Cancel Hammer (Escape)"
                   aria-label="Cancel Hammer Mode"
                 >
-                  ✕
+                  Cancel (Esc)
                 </button>
               </div>
             )}
-
 
             {/* Floating Score Popups */}
             <FloatingScores popups={popups} />
 
             {/* 8x8 Board with Particle Explosion Canvas */}
-            <div className="board-outer-wrapper">
+            <div className={`board-outer-wrapper${phase === 'gameOver' ? ' board-outer-wrapper--locked' : ''}`}>
               <ParticleCanvas trigger={particleTrigger} />
               <GameBoard
                 board={board}
                 boardColors={boardColors}
+                boardPatterns={boardPatterns}
                 boardRef={boardRef}
                 preview={preview}
                 effect={boardEffect}
                 shake={shakeBoard}
                 hammerActive={hammerActive}
+                locked={phase === 'gameOver'}
                 onCellClick={handleCellClick}
               />
             </div>
 
             {/* Mobile Power-Ups Strip (visible only on mobile) */}
-            <div className="mobile-boosters-strip">
+            <div className="mobile-boosters-strip" role="group" aria-label="Tactical boosters">
               <button
                 type="button"
                 className="mobile-booster-btn"
                 onClick={handleUseReroll}
-                disabled={rerollsLeft === 0}
-                title="Reroll Tray"
+                disabled={rerollsLeft === 0 || phase !== 'playing'}
+                title={rerollsLeft === 0 ? 'No rerolls remaining' : 'Reroll piece tray'}
               >
-                🔄 Reroll ({rerollsLeft})
+                <span aria-hidden="true">🔄</span>
+                <span>Reroll ({rerollsLeft})</span>
               </button>
               <button
                 type="button"
                 className={`mobile-booster-btn${hammerActive ? ' mobile-booster-btn--active' : ''}`}
                 onClick={handleToggleHammer}
-                disabled={hammersLeft === 0}
-                title="Hammer Smash"
+                disabled={hammersLeft === 0 || phase !== 'playing'}
+                aria-pressed={hammerActive}
+                title={hammersLeft === 0 ? 'No hammers remaining' : 'Hammer block smash'}
               >
-                🔨 Hammer ({hammersLeft})
+                <span aria-hidden="true">🔨</span>
+                <span>{hammerActive ? 'Cancel (Esc)' : `Hammer (${hammersLeft})`}</span>
               </button>
               <button
                 type="button"
                 className="mobile-booster-btn"
                 onClick={handleUseUndo}
-                disabled={undoHistory.length === 0 || undosLeft === 0}
-                title="Undo Move"
+                disabled={undoHistory.length === 0 || undosLeft === 0 || phase !== 'playing'}
+                title={
+                  undosLeft === 0
+                    ? 'No undos remaining'
+                    : undoHistory.length === 0
+                      ? 'No previous move to revert'
+                      : 'Undo last placement'
+                }
               >
-                ↩️ Undo ({undosLeft})
+                <span aria-hidden="true">↩️</span>
+                <span>Undo ({undosLeft})</span>
               </button>
             </div>
 
-            {/* Return Home Button (Desktop: inside center column) */}
-            <div className="game-bottom-actions desktop-only-actions">
+            {/* Mobile Piece Dock (positioned directly in thumb zone) */}
+            <div className="mobile-piece-tray-wrapper">
+              <PieceTray
+                pieces={pieces}
+                activePieceId={activeDragPieceId}
+                returningPieceId={returningPieceId}
+                locked={phase === 'gameOver'}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+              />
+            </div>
+
+            {/* Return Home Button */}
+            <div className="game-bottom-actions">
               <button className="text-pill-btn" type="button" onClick={returnHome}>
                 ← Back to Home
               </button>
             </div>
           </main>
 
-          {/* Column 3: Right - Generated Blocks Arsenal */}
-          <PieceTray
-            pieces={pieces}
-            activePieceId={activeDragPieceId}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={clearDrag}
-          />
+          {/* Zone 3: Right - Generated Blocks Arsenal & Live Match Feed */}
+          <div className="desktop-right-column">
+            <PieceTray
+              pieces={pieces}
+              activePieceId={activeDragPieceId}
+              returningPieceId={returningPieceId}
+              locked={phase === 'gameOver'}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+            />
 
-          {/* Return Home Button (Mobile: below piece dock) */}
-          <div className="game-bottom-actions mobile-only-actions">
-            <button className="text-pill-btn" type="button" onClick={returnHome}>
-              ← Back to Home
-            </button>
+            <DesktopSidebarRight
+              currentUserId={currentUserId}
+              matchLogs={matchLogs}
+              onOpenLeaderboard={() => {
+                navigate('/leaderboard')
+                playSound('buttonClick')
+              }}
+              locked={phase === 'gameOver'}
+            />
           </div>
         </div>
       )}
@@ -1102,6 +1216,8 @@ function App() {
           highestCombo={highestCombo}
           blocksPlaced={blocksPlaced}
           durationSeconds={durationSeconds}
+          saveStatus={saveStatus}
+          currentUser={currentUser}
           onPlayAgain={startNewGame}
           onOpenLeaderboard={() => {
             navigate('/leaderboard')
@@ -1113,6 +1229,7 @@ function App() {
           }}
           onOpenAuth={() => openAuth('register')}
           onHome={returnHome}
+          onRetrySave={retrySaveSession}
         />
       )}
 
@@ -1154,7 +1271,7 @@ function App() {
         }}
       />
 
-      {/* Achievements / Badges Modal (Section 47) */}
+      {/* Achievements / Badges Modal */}
       <AchievementsModal
         isOpen={isAchievementsOpen}
         onClose={closeModal}

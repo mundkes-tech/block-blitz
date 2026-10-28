@@ -1,0 +1,143 @@
+/* ==========================================================================
+   BLOCK BLITZ - PREMIUM DESIGN SYSTEM TOKENS
+   Layered dark-arcade aesthetic, color-blind distinguishable palettes,
+   fluid typography, spacing, radius, elevations, and motion curves.
+   ========================================================================== */
+
+:root {
+  /* Fonts */
+  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+
+  /* Layered Dark-Arcade Surfaces */
+  --surface-ground: #070b12;
+  --surface-base: #0b1320;
+  --surface-card: #121d2f;
+  --surface-card-hover: #17253b;
+  --surface-elevated: #1a2a44;
+  --surface-overlay: rgba(7, 11, 18, 0.88);
+  --surface-subtle: rgba(255, 255, 255, 0.04);
+  --surface-subtle-hover: rgba(255, 255, 255, 0.08);
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.28);
+  --border-focus: #38bdf8;
+
+  /* Primary Accent (Arcade Emerald / Neon Cyan) */
+  --accent-primary: #10b981;
+  --accent-primary-hover: #34d399;
+  --accent-primary-active: #059669;
+  --accent-primary-subtle: rgba(16, 185, 129, 0.14);
+  --accent-primary-glow: 0 0 20px rgba(16, 185, 129, 0.45);
+  --accent-primary-text: #022c22;
+
+  /* Secondary Accent (Electric Amber / Gold) */
+  --accent-secondary: #f59e0b;
+  --accent-secondary-hover: #fbbf24;
+  --accent-secondary-active: #d97706;
+  --accent-secondary-subtle: rgba(245, 158, 11, 0.14);
+  --accent-secondary-glow: 0 0 20px rgba(245, 158, 11, 0.4);
+  --accent-secondary-text: #451a03;
+
+  /* Semantic Feedback */
+  --color-success: #10b981;
+  --color-success-subtle: rgba(16, 185, 129, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-subtle: rgba(245, 158, 11, 0.15);
+  --color-error: #ef4444;
+  --color-error-hover: #f87171;
+  --color-error-subtle: rgba(239, 68, 68, 0.16);
+  --color-info: #06b6d4;
+  --color-info-subtle: rgba(6, 182, 212, 0.15);
+
+  /* High Contrast Text */
+  --text-main: #f8fafc;
+  --text-sub: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --text-inverse: #070b12;
+
+  /* 8 Color-Blind Distinguishable Block Palette (Wong / Okabe-Ito optimized) */
+  /* Each color is paired with a distinct tactile pattern cue */
+  --block-1: #e69f00; /* Amber Orange - Dots */
+  --block-2: #56b4e9; /* Sky Blue - Diagonal Stripes */
+  --block-3: #009e73; /* Bluish Green - Grid */
+  --block-4: #f0e442; /* Yellow - Cross */
+  --block-5: #0072b2; /* Deep Blue - Concentric Rings */
+  --block-6: #d55e00; /* Vermillion Coral - Diamond */
+  --block-7: #cc79a7; /* Magenta Spark - Star / Spark */
+  --block-8: #22d3ee; /* Electric Cyan - Horizontal Stripes */
+
+  /* Board & Cell Geometry */
+  --board-bg: #0b121e;
+  --board-border: #1e293b;
+  --cell-empty: #0e1726;
+  --cell-empty-border: rgba(255, 255, 255, 0.05);
+  --cell-empty-hover: #142033;
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+
+  /* Radius Scale */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadow & Elevation Scale */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.75);
+
+  /* Motion & Easing */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-instant: 100ms ease;
+  --transition-fast: 150ms var(--ease-smooth);
+  --transition-base: 220ms var(--ease-smooth);
+  --transition-slow: 350ms var(--ease-smooth);
+
+  /* Fluid Typography with clamp() */
+  --font-size-2xs: clamp(0.65rem, 0.6rem + 0.2vw, 0.72rem);
+  --font-size-xs: clamp(0.72rem, 0.68rem + 0.25vw, 0.8rem);
+  --font-size-sm: clamp(0.82rem, 0.78rem + 0.3vw, 0.875rem);
+  --font-size-base: clamp(0.92rem, 0.88rem + 0.35vw, 1rem);
+  --font-size-md: clamp(1.05rem, 0.98rem + 0.4vw, 1.15rem);
+  --font-size-lg: clamp(1.15rem, 1.05rem + 0.6vw, 1.35rem);
+  --font-size-xl: clamp(1.35rem, 1.2rem + 0.85vw, 1.65rem);
+  --font-size-2xl: clamp(1.65rem, 1.45rem + 1.2vw, 2.15rem);
+  --font-size-3xl: clamp(2.1rem, 1.8rem + 1.6vw, 2.85rem);
+  --font-size-score: clamp(2.25rem, 1.85rem + 2.2vw, 3.6rem);
+
+  /* Safe Area Insets for Mobile */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Reduced Motion Preference Override */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

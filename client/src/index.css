@@ -38,7 +38,6 @@ body {
 #root {
   min-height: 100%;
 }
-
 /* Custom cyber scrollbar */
 ::-webkit-scrollbar {
   width: 10px;

@@ -1,6 +1,6 @@
 import { useMemo, type RefObject } from 'react'
 import type { Board } from '../game/board'
-import type { BlockShape } from '../game/shapes'
+import type { BlockPattern, BlockShape } from '../game/shapes'
 import GridCell from './GridCell'
 
 export type BoardPreview = {
@@ -20,22 +20,26 @@ export type BoardEffect = {
 type GameBoardProps = {
   board: Board
   boardColors?: (string | null)[][]
+  boardPatterns?: (BlockPattern | null)[][]
   boardRef?: RefObject<HTMLDivElement | null>
   preview?: BoardPreview | null
   effect?: BoardEffect | null
   shake?: boolean
   hammerActive?: boolean
+  locked?: boolean
   onCellClick?: (row: number, col: number) => void
 }
 
 function GameBoard({
   board,
   boardColors,
+  boardPatterns,
   boardRef,
   preview,
   effect,
   shake,
   hammerActive,
+  locked,
   onCellClick,
 }: GameBoardProps) {
   const previewCells = useMemo(
@@ -47,10 +51,12 @@ function GameBoard({
       ),
     [preview],
   )
+
   const placementCells = useMemo(
     () => new Set(effect?.placedCells.map((cell) => `${cell.row}:${cell.col}`)),
     [effect],
   )
+
   const clearedCells = useMemo(() => {
     if (!effect) {
       return new Set<string>()
@@ -78,39 +84,52 @@ function GameBoard({
   return (
     <div
       ref={boardRef}
-      className={`game-board${shake ? ' game-board--shake' : ''}${hammerActive ? ' game-board--hammer' : ''}`}
+      className={`game-board${shake ? ' game-board--shake' : ''}${
+        hammerActive ? ' game-board--hammer' : ''
+      }${locked ? ' game-board--locked' : ''}`}
       role="grid"
       aria-label="8 by 8 game board"
+      aria-disabled={locked}
     >
       {board.map((row, rowIndex) =>
-        row.map((occupied, columnIndex) => (
-          <GridCell
-            key={`${rowIndex}-${columnIndex}`}
-            occupied={occupied}
-            color={boardColors?.[rowIndex]?.[columnIndex]}
-            effect={
-              clearedCells.has(`${rowIndex}:${columnIndex}`)
-                ? clearEffect
-                : placementCells.has(`${rowIndex}:${columnIndex}`)
-                  ? 'placement'
-                  : undefined
-            }
-            preview={
-              previewCells.has(`${rowIndex}:${columnIndex}`)
-                ? preview?.valid
-                  ? 'valid'
-                  : 'invalid'
-                : undefined
-            }
-            previewColor={preview?.shape.color}
-            isHammerTarget={hammerActive && occupied}
-            onClick={() => {
-              if (hammerActive && occupied && onCellClick) {
-                onCellClick(rowIndex, columnIndex)
+        row.map((occupied, columnIndex) => {
+          const cellKey = `${rowIndex}:${columnIndex}`
+          const isPreview = previewCells.has(cellKey)
+          const isCleared = clearedCells.has(cellKey)
+          const isPlaced = placementCells.has(cellKey)
+
+          return (
+            <GridCell
+              key={`${rowIndex}-${columnIndex}`}
+              occupied={occupied}
+              color={boardColors?.[rowIndex]?.[columnIndex]}
+              pattern={boardPatterns?.[rowIndex]?.[columnIndex]}
+              effect={
+                isCleared
+                  ? clearEffect
+                  : isPlaced
+                    ? 'placement'
+                    : undefined
               }
-            }}
-          />
-        )),
+              preview={
+                isPreview
+                  ? preview?.valid
+                    ? 'valid'
+                    : 'invalid'
+                  : undefined
+              }
+              previewColor={preview?.shape.color}
+              previewPattern={preview?.shape.pattern}
+              isHammerTarget={hammerActive && occupied}
+              locked={locked}
+              onClick={() => {
+                if (hammerActive && occupied && onCellClick && !locked) {
+                  onCellClick(rowIndex, columnIndex)
+                }
+              }}
+            />
+          )
+        }),
       )}
     </div>
   )

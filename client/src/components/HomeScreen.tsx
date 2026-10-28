@@ -1,4 +1,4 @@
-import { useState, useRef, type PointerEvent } from 'react'
+import { useState } from 'react'
 import type { UserProfile } from '../services/gameSessionsApi'
 import type { PlayerLevelInfo } from '../game/achievements'
 
@@ -6,9 +6,11 @@ type GameMode = 'classic' | 'blitz' | 'bomb'
 
 type HomeScreenProps = {
   bestScore: number
+  hasActiveGame?: boolean
   totalLinesCleared?: number
   unlockedBadgesCount?: number
   onPlay: (mode?: GameMode) => void
+  onNewGame?: () => void
   currentUser?: UserProfile | null
   levelInfo?: PlayerLevelInfo
   onOpenLeaderboard: () => void
@@ -19,9 +21,11 @@ type HomeScreenProps = {
 
 export function HomeScreen({
   bestScore,
+  hasActiveGame = false,
   totalLinesCleared = 0,
   unlockedBadgesCount = 0,
   onPlay,
+  onNewGame,
   currentUser,
   levelInfo,
   onOpenLeaderboard,
@@ -30,8 +34,6 @@ export function HomeScreen({
   onOpenAchievements,
 }: HomeScreenProps) {
   const [selectedMode, setSelectedMode] = useState<GameMode>('classic')
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
-  const showcaseRef = useRef<HTMLDivElement>(null)
 
   const dailyTargetLines = 10
   const dailyLinesProgress = Math.min(100, Math.round((totalLinesCleared / dailyTargetLines) * 100))
@@ -39,47 +41,21 @@ export function HomeScreen({
 
   const totalBadges = 8
   const badgesProgress = Math.min(100, Math.round((unlockedBadgesCount / totalBadges) * 100))
-  const areBadgesCompleted = unlockedBadgesCount >= totalBadges
-
-  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!showcaseRef.current) return
-    const rect = showcaseRef.current.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width - 0.5
-    const y = (e.clientY - rect.top) / rect.height - 0.5
-    setTilt({ x: x * 10, y: -y * 10 })
-  }
-
-  const handlePointerLeave = () => {
-    setTilt({ x: 0, y: 0 })
-  }
-
-  const handleStartGame = () => {
-    onPlay(selectedMode)
-  }
 
   return (
-    <main className="home-screen-portal">
-      {/* Dynamic Animated Ambient Neon Auras */}
+    <main className="home-screen-portal" role="main">
+      {/* Dynamic Ambient Auras (Decorative) */}
       <div className="portal-ambient-auras" aria-hidden="true">
         <div className="aura-blob aura-blob--emerald" />
         <div className="aura-blob aura-blob--cyan" />
         <div className="aura-blob aura-blob--purple" />
       </div>
 
-      {/* Floating 3D Arcade Shapes Accent Field */}
-      <div className="portal-floating-shapes" aria-hidden="true">
-        <div className="float-shape float-shape--1" />
-        <div className="float-shape float-shape--2" />
-        <div className="float-shape float-shape--3" />
-        <div className="float-shape float-shape--4" />
-        <div className="float-shape float-shape--5" />
-      </div>
-
       <div className="portal-content-container">
         {/* Top Hero Brand Header */}
         <header className="portal-hero-header">
           <div className="portal-brand-pill">
-            <span className="brand-gem-spin">💎</span>
+            <span className="brand-gem-spin" aria-hidden="true">💎</span>
             <span className="brand-pill-text">ARCADE BLOCK PUZZLE</span>
             <span className="brand-pill-badge">OFFICIAL</span>
           </div>
@@ -94,301 +70,191 @@ export function HomeScreen({
           </p>
 
           <p className="portal-lead-text">
-            Fit geometric neon blocks onto the 8×8 grid, chain explosive combo clears, and climb the global leaderboards!
+            Fit geometric arcade blocks onto the 8×8 grid, chain explosive line clears, and conquer the global leaderboards!
           </p>
         </header>
 
-        {/* Main Two-Column Interactive Gaming Lobby */}
-        <div className="portal-main-grid">
-          {/* Left Column: Game Modes & Giant 3D Play Button */}
-          <section className="portal-action-column" aria-label="Game Mode and Launch">
-            {/* Player Status Ribbon */}
-            <div className="portal-player-ribbon">
-              <div className="ribbon-avatar" onClick={onOpenDashboard} role="button" tabIndex={0} title="Open Player Dashboard">
-                <span>{currentUser ? currentUser.name.charAt(0).toUpperCase() : '⚡'}</span>
-              </div>
-              <div className="ribbon-info">
-                <div className="ribbon-name-row">
-                  <span className="ribbon-player-name">{currentUser?.name ?? 'Guest Blitz Player'}</span>
-                  {levelInfo && (
-                    <span className="ribbon-tier-tag">
-                      Lv.{levelInfo.level} {levelInfo.title}
-                    </span>
-                  )}
-                </div>
-                <div className="ribbon-stats-row">
-                  <span className="ribbon-stat-item">🏆 Best: <strong>{bestScore.toLocaleString()}</strong> pts</span>
-                  <span className="ribbon-stat-divider">•</span>
-                  <span className="ribbon-stat-item">🎖️ Badges: <strong>{unlockedBadgesCount} / {totalBadges}</strong></span>
-                </div>
-              </div>
-            </div>
+        {/* Best Score & Career Status Banner */}
+        <section className="portal-stats-hero" aria-label="Player high score">
+          <div className="portal-stat-card">
+            <span className="portal-stat-label">PERSONAL BEST</span>
+            <strong className="portal-stat-value tabular-nums font-mono">
+              {bestScore.toLocaleString()}
+            </strong>
+            <span className="portal-stat-sub">
+              {currentUser ? `Ranked as ${currentUser.name}` : 'Saved locally · Sign in to rank'}
+            </span>
+          </div>
 
-            {/* Giant 3D Arcade Push Button (Immediate First Fold CTA) */}
-            <div className="portal-play-action-wrapper">
-              <button
-                className="arcade-launch-button"
-                type="button"
-                onClick={handleStartGame}
-                aria-label={`Start game in ${selectedMode} mode`}
+          {levelInfo && (
+            <div className="portal-stat-card">
+              <span className="portal-stat-label">PLAYER TIER</span>
+              <strong className="portal-stat-value portal-stat-tier">
+                Lv.{levelInfo.level} {levelInfo.title}
+              </strong>
+              <div
+                className="portal-level-track"
+                role="progressbar"
+                aria-valuenow={levelInfo.progressPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Level progress"
               >
-                <span className="launch-btn-shadow" />
-                <span className="launch-btn-edge" />
-                <span className="launch-btn-front">
-                  <span className="launch-btn-icon">🎮</span>
-                  <span className="launch-btn-label">START GAME</span>
-                  <span className="launch-btn-xp-pill">PLAY NOW</span>
-                </span>
-              </button>
-            </div>
-
-            {/* Mode Selection Cards */}
-            <div className="portal-modes-section">
-              <div className="section-eyebrow-row">
-                <span className="section-eyebrow">SELECT GAME MODE</span>
-                <span className="section-eyebrow-hint">Pick your challenge style</span>
-              </div>
-
-              <div className="portal-modes-grid" role="radiogroup" aria-label="Select Game Mode">
-                {/* Mode 1: Classic Endless */}
                 <div
-                  className={`mode-card${selectedMode === 'classic' ? ' mode-card--selected' : ''}`}
-                  onClick={() => setSelectedMode('classic')}
-                  role="radio"
-                  aria-checked={selectedMode === 'classic'}
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedMode('classic') }}
-                >
-                  <div className="mode-card-header">
-                    <span className="mode-card-icon mode-icon--classic">🟢</span>
-                    <span className="mode-card-badge mode-badge--emerald">UNLIMITED</span>
-                  </div>
-                  <strong className="mode-card-title">Classic Endless</strong>
-                  <p className="mode-card-desc">Pure strategic puzzle flow. No timer, fair piece generation, and limitless combos.</p>
-                  <div className="mode-card-footer">
-                    <span className="mode-card-stat">⭐ Best: {bestScore.toLocaleString()}</span>
-                    <span className="mode-card-check">✓ Active</span>
-                  </div>
-                </div>
-
-                {/* Mode 2: Timed Blitz */}
-                <div
-                  className={`mode-card${selectedMode === 'blitz' ? ' mode-card--selected' : ''}`}
-                  onClick={() => setSelectedMode('blitz')}
-                  role="radio"
-                  aria-checked={selectedMode === 'blitz'}
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedMode('blitz') }}
-                >
-                  <div className="mode-card-header">
-                    <span className="mode-card-icon mode-icon--blitz">⚡</span>
-                    <span className="mode-card-badge mode-badge--amber">60S RUSH</span>
-                  </div>
-                  <strong className="mode-card-title">Blitz Rush</strong>
-                  <p className="mode-card-desc">Race the 60-second countdown! Chain rapid clears for 2× multiplier XP frenzy.</p>
-                  <div className="mode-card-footer">
-                    <span className="mode-card-stat">🔥 High Speed</span>
-                    <span className="mode-card-check">✓ Active</span>
-                  </div>
-                </div>
-
-                {/* Mode 3: Bomb Buster */}
-                <div
-                  className={`mode-card${selectedMode === 'bomb' ? ' mode-card--selected' : ''}`}
-                  onClick={() => setSelectedMode('bomb')}
-                  role="radio"
-                  aria-checked={selectedMode === 'bomb'}
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedMode('bomb') }}
-                >
-                  <div className="mode-card-header">
-                    <span className="mode-card-icon mode-icon--bomb">💣</span>
-                    <span className="mode-card-badge mode-badge--rose">HAZARD</span>
-                  </div>
-                  <strong className="mode-card-title">Bomb Buster</strong>
-                  <p className="mode-card-desc">Tactical challenge! Defuse ticking hazard blocks by clearing lines before zero.</p>
-                  <div className="mode-card-footer">
-                    <span className="mode-card-stat">💥 Bonus Loot</span>
-                    <span className="mode-card-check">✓ Active</span>
-                  </div>
-                </div>
+                  className="portal-level-fill"
+                  style={{ width: `${levelInfo.progressPercent}%` }}
+                />
               </div>
             </div>
+          )}
+        </section>
 
-            {/* Tactical Power-ups Info Strip */}
-            <div className="portal-boosters-preview">
-              <span className="boosters-preview-label">IN-GAME POWER-UPS:</span>
-              <div className="boosters-preview-items">
-                <span className="booster-pill" title="Reroll 3 fresh pieces"><span className="booster-emoji">🔄</span> Reroll (1)</span>
-                <span className="booster-pill" title="Smash any occupied block"><span className="booster-emoji">🔨</span> Hammer (1)</span>
-                <span className="booster-pill" title="Undo your previous placement"><span className="booster-emoji">↩️</span> Undo (1)</span>
-              </div>
-            </div>
-          </section>
+        {/* Game Mode Selection */}
+        <section className="portal-modes-section" aria-label="Select Game Mode">
+          <div className="portal-modes-header">
+            <span className="eyebrow">SELECT GAME MODE</span>
+          </div>
 
-          {/* Right Column: 3D Showcase, Quests Hub & Quick Modals */}
-          <section className="portal-hub-column" aria-label="Game Showcase and Quests">
-            {/* 3D Isometric Board Showcase */}
-            <div
-              ref={showcaseRef}
-              className="portal-showcase-card"
-              onPointerMove={handlePointerMove}
-              onPointerLeave={handlePointerLeave}
+          <div className="portal-modes-grid" role="radiogroup" aria-label="Game Modes">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selectedMode === 'classic'}
+              className={`mode-card${selectedMode === 'classic' ? ' mode-card--selected' : ''}`}
+              onClick={() => setSelectedMode('classic')}
             >
-              <div className="showcase-header">
-                <span className="showcase-badge">⚡ LIVE ARENA PREVIEW</span>
-                <span className="showcase-hint">8×8 Puzzle Grid</span>
-              </div>
+              <div className="mode-card-badge">STANDARD</div>
+              <span className="mode-icon" aria-hidden="true">🟢</span>
+              <h3>Classic Blitz</h3>
+              <p>Timeless block puzzle experience. Endless placement until no moves remain.</p>
+            </button>
 
-              <div className="showcase-board-wrapper">
-                <div
-                  className="showcase-board-grid"
-                  style={{
-                    transform: `perspective(700px) rotateX(${12 + tilt.y * 0.7}deg) rotateY(${-4 + tilt.x * 0.7}deg)`,
-                  }}
-                >
-                  {Array.from({ length: 64 }, (_, index) => {
-                    const filledPositions: Record<number, string> = {
-                      1: '#f59e0b',
-                      2: '#f59e0b',
-                      9: '#f59e0b',
-                      10: '#f59e0b',
-                      18: '#06b6d4',
-                      19: '#06b6d4',
-                      26: '#06b6d4',
-                      34: '#ec4899',
-                      35: '#ec4899',
-                      36: '#ec4899',
-                      43: '#ec4899',
-                      51: '#a855f7',
-                      52: '#a855f7',
-                      53: '#a855f7',
-                    }
-                    const color = filledPositions[index]
-                    return (
-                      <span
-                        key={index}
-                        className={`showcase-cell ${color ? 'showcase-cell--filled' : ''}`}
-                        style={
-                          color
-                            ? {
-                                backgroundColor: color,
-                                boxShadow: `0 0 12px ${color}bb, inset 0 2px 2px rgba(255, 255, 255, 0.6), inset 0 -2px 3px rgba(0, 0, 0, 0.4)`,
-                              }
-                            : undefined
-                        }
-                      />
-                    )
-                  })}
-                </div>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selectedMode === 'blitz'}
+              className={`mode-card${selectedMode === 'blitz' ? ' mode-card--selected' : ''}`}
+              onClick={() => setSelectedMode('blitz')}
+            >
+              <div className="mode-card-badge">TIMED</div>
+              <span className="mode-icon" aria-hidden="true">⚡</span>
+              <h3>Blitz Rush</h3>
+              <p>Fast-paced arcade session. Clear rows rapidly to maximize combo bonus points.</p>
+            </button>
 
-                {/* Floating Celebratory Chips */}
-                <div className="showcase-chips-cluster">
-                  <span className="showcase-chip chip-top">Combo 3×! 🔥</span>
-                  <span className="showcase-chip chip-left">Line Clear! ⚡</span>
-                  <span className="showcase-chip chip-bottom">High Score! 🏆</span>
-                </div>
-              </div>
-            </div>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selectedMode === 'bomb'}
+              className={`mode-card${selectedMode === 'bomb' ? ' mode-card--selected' : ''}`}
+              onClick={() => setSelectedMode('bomb')}
+            >
+              <div className="mode-card-badge">TACTICAL</div>
+              <span className="mode-icon" aria-hidden="true">💣</span>
+              <h3>Bomb Defense</h3>
+              <p>Defuse ticking explosive obstacles before their countdown reaches zero.</p>
+            </button>
+          </div>
+        </section>
 
-            {/* Daily Quests Teaser Card */}
-            <div className="portal-quests-card">
-              <div className="quests-card-header">
-                <div className="quests-title-group">
-                  <span className="quests-icon">🎯</span>
-                  <div>
-                    <strong className="quests-heading">DAILY MISSIONS</strong>
-                    <span className="quests-subheading">Complete to unlock badges & rank</span>
-                  </div>
-                </div>
+        {/* Action Button Strip */}
+        <section className="portal-play-strip" aria-label="Launch game">
+          {hasActiveGame ? (
+            <div className="portal-active-game-actions">
+              <button
+                type="button"
+                className="portal-play-btn portal-play-btn--continue animate-pulse-glow"
+                onClick={() => onPlay(selectedMode)}
+              >
+                ▶ CONTINUE MATCH
+              </button>
+              {onNewGame && (
                 <button
                   type="button"
-                  className="quests-action-link"
-                  onClick={onOpenChallenge}
+                  className="portal-secondary-play-btn"
+                  onClick={onNewGame}
                 >
-                  View All →
+                  Restart New Match
                 </button>
-              </div>
-
-              <div className="quests-list">
-                <div className="quest-row" onClick={onOpenChallenge} role="button" tabIndex={0} title="Open Daily Challenge">
-                  <div className="quest-icon-badge">⚡</div>
-                  <div className="quest-details">
-                    <div className="quest-label-row">
-                      <span className="quest-name">Daily Target: 10 Lines</span>
-                      <span className={`quest-count ${isDailyCompleted ? 'text-emerald' : ''}`}>
-                        {isDailyCompleted ? 'COMPLETED! ⭐' : `${Math.min(totalLinesCleared, dailyTargetLines)} / ${dailyTargetLines}`}
-                      </span>
-                    </div>
-                    <div className="quest-progress-track">
-                      <div
-                        className={`quest-progress-bar ${isDailyCompleted ? 'quest-progress-bar--complete' : ''}`}
-                        style={{ width: `${dailyLinesProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="quest-row" onClick={onOpenAchievements} role="button" tabIndex={0} title="Open Badges">
-                  <div className="quest-icon-badge">🎖️</div>
-                  <div className="quest-details">
-                    <div className="quest-label-row">
-                      <span className="quest-name">Achievements Collector</span>
-                      <span className={`quest-count ${areBadgesCompleted ? 'text-emerald' : ''}`}>
-                        {areBadgesCompleted ? 'ALL UNLOCKED! 👑' : `${unlockedBadgesCount} / ${totalBadges}`}
-                      </span>
-                    </div>
-                    <div className="quest-progress-track">
-                      <div
-                        className={`quest-progress-bar ${areBadgesCompleted ? 'quest-progress-bar--complete' : ''}`}
-                        style={{ width: `${badgesProgress}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
+          ) : (
+            <button
+              type="button"
+              className="portal-play-btn animate-pulse-glow"
+              onClick={() => onPlay(selectedMode)}
+            >
+              ▶ PLAY NOW
+            </button>
+          )}
+        </section>
 
-            {/* Quick Action Navigation Grid */}
-            <div className="portal-quick-actions-bar">
-              <button
-                type="button"
-                className="portal-quick-btn"
-                onClick={onOpenLeaderboard}
-              >
-                <span className="quick-btn-icon">🏆</span>
-                <span className="quick-btn-label">Leaderboard</span>
-              </button>
-
-              <button
-                type="button"
-                className="portal-quick-btn"
-                onClick={onOpenDashboard}
-              >
-                <span className="quick-btn-icon">📊</span>
-                <span className="quick-btn-label">My Stats</span>
-              </button>
-
-              <button
-                type="button"
-                className="portal-quick-btn"
-                onClick={onOpenChallenge}
-              >
-                <span className="quick-btn-icon">🎯</span>
-                <span className="quick-btn-label">Missions</span>
-              </button>
-
-              <button
-                type="button"
-                className="portal-quick-btn"
-                onClick={onOpenAchievements}
-              >
-                <span className="quick-btn-icon">🎖️</span>
-                <span className="quick-btn-label">Badges</span>
-              </button>
+        {/* Secondary Hub Cards: Mission, Badges, Arena */}
+        <section className="portal-hub-grid" aria-label="Game features">
+          <button
+            type="button"
+            className="hub-card"
+            onClick={onOpenChallenge}
+          >
+            <div className="hub-card-top">
+              <span className="hub-icon" aria-hidden="true">{isDailyCompleted ? '🏆' : '🎯'}</span>
+              <span className="hub-eyebrow">DAILY MISSION</span>
             </div>
-          </section>
-        </div>
+            <h4>Clear 10 Lines</h4>
+            <div className="hub-progress-track">
+              <div className="hub-progress-fill" style={{ width: `${dailyLinesProgress}%` }} />
+            </div>
+            <span className="hub-footer-text">
+              {isDailyCompleted ? '✓ Completed today!' : `${10 - totalLinesCleared} more lines needed`}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="hub-card"
+            onClick={onOpenAchievements}
+          >
+            <div className="hub-card-top">
+              <span className="hub-icon" aria-hidden="true">🎖️</span>
+              <span className="hub-eyebrow">MILESTONES</span>
+            </div>
+            <h4>Achievements</h4>
+            <div className="hub-progress-track">
+              <div className="hub-progress-fill" style={{ width: `${badgesProgress}%` }} />
+            </div>
+            <span className="hub-footer-text">
+              {unlockedBadgesCount} / {totalBadges} Badges Unlocked
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="hub-card"
+            onClick={onOpenLeaderboard}
+          >
+            <div className="hub-card-top">
+              <span className="hub-icon" aria-hidden="true">🏆</span>
+              <span className="hub-eyebrow">GLOBAL RANKS</span>
+            </div>
+            <h4>Leaderboard</h4>
+            <p className="hub-desc">View all-time and daily top scores</p>
+            <span className="hub-footer-text">Check Standings →</span>
+          </button>
+
+          <button
+            type="button"
+            className="hub-card"
+            onClick={onOpenDashboard}
+          >
+            <div className="hub-card-top">
+              <span className="hub-icon" aria-hidden="true">📊</span>
+              <span className="hub-eyebrow">PROFILE & STATS</span>
+            </div>
+            <h4>Dashboard</h4>
+            <p className="hub-desc">Career match log, lines, and averages</p>
+            <span className="hub-footer-text">View History →</span>
+          </button>
+        </section>
       </div>
     </main>
   )
