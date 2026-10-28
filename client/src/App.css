@@ -3681,8 +3681,7 @@ button,
     z-index: 1000;
     flex-wrap: nowrap;
     height: 44px;
-    padding: 0 0.5rem;
-    gap: 0.35rem;
+    padding: 0 clamp(0.2rem, 1.2vw, 0.45rem);
     width: 100%;
     max-width: 100vw;
     background: rgba(10, 16, 28, 0.94);
@@ -3690,6 +3689,9 @@ button,
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--card-border);
     box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     overflow: hidden;
   }
 
@@ -3702,7 +3704,7 @@ button,
 
   .navbar-left {
     order: 1;
-    gap: 0.35rem;
+    gap: 0.25rem;
     display: flex;
     align-items: center;
     flex-shrink: 0;
@@ -3710,7 +3712,7 @@ button,
   }
 
   .navbar-logo-icon {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     flex-shrink: 0;
   }
 
@@ -3720,8 +3722,8 @@ button,
   }
 
   .navbar-title {
-    font-size: 0.85rem;
-    letter-spacing: 0.03em;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
     white-space: nowrap;
   }
 
@@ -3731,7 +3733,7 @@ button,
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.55rem;
+    gap: 0.35rem;
     border-top: none;
     padding-top: 0;
     margin: 0 auto;
@@ -3742,12 +3744,12 @@ button,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.85rem;
-    height: 1.85rem;
-    min-width: 1.85rem;
+    width: 1.72rem;
+    height: 1.72rem;
+    min-width: 1.72rem;
     padding: 0 !important;
-    font-size: 0.82rem;
-    border-radius: 0.5rem;
+    font-size: 0.78rem;
+    border-radius: 0.45rem;
     touch-action: manipulation;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -3761,16 +3763,16 @@ button,
   .navbar-right {
     order: 3;
     margin-left: 0;
-    gap: 0.45rem;
+    gap: 0.3rem;
     display: flex;
     align-items: center;
     flex-shrink: 0;
   }
 
   .navbar-level-badge {
-    padding: 0.18rem 0.4rem;
-    gap: 0.2rem;
-    font-size: 0.68rem;
+    padding: 0.12rem 0.3rem;
+    gap: 0.15rem;
+    font-size: 0.64rem;
     flex-shrink: 0;
   }
 
@@ -3779,7 +3781,7 @@ button,
   }
 
   .level-number {
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     font-weight: 800;
   }
 
@@ -3788,10 +3790,10 @@ button,
   }
 
   .audio-btn {
-    width: 1.85rem;
-    height: 1.85rem;
-    min-width: 1.85rem;
-    font-size: 0.82rem;
+    width: 1.72rem;
+    height: 1.72rem;
+    min-width: 1.72rem;
+    font-size: 0.78rem;
     display: grid;
     place-items: center;
     flex-shrink: 0;
@@ -3799,8 +3801,17 @@ button,
   }
 
   .user-profile-pill {
-    padding: 0.15rem 0.35rem;
-    flex-shrink: 0;
+    width: 1.72rem !important;
+    height: 1.72rem !important;
+    min-width: 1.72rem !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid var(--accent-primary) !important;
+    display: grid !important;
+    place-items: center !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box;
   }
 
   .user-pill-name {
@@ -3808,18 +3819,21 @@ button,
   }
 
   .avatar-dot {
-    width: 1.4rem;
-    height: 1.4rem;
-    font-size: 0.7rem;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 50% !important;
+    font-size: 0.7rem !important;
+    display: grid !important;
+    place-items: center !important;
   }
 
   .nav-signin-btn {
-    width: 1.85rem !important;
-    height: 1.85rem !important;
-    min-width: 1.85rem !important;
+    width: 1.72rem !important;
+    height: 1.72rem !important;
+    min-width: 1.72rem !important;
     padding: 0 !important;
     border-radius: 50% !important;
-    font-size: 0.78rem !important;
+    font-size: 0.75rem !important;
     display: grid !important;
     place-items: center !important;
     flex-shrink: 0 !important;
@@ -3832,57 +3846,62 @@ button,
 
 @media (max-width: 400px) {
   .top-navbar {
-    padding: 0.2rem 0.35rem;
-    gap: 0.15rem;
+    padding: 0 0.2rem;
   }
 
   .navbar-left {
-    gap: 0.2rem;
+    gap: 0.15rem;
   }
 
   .navbar-logo-icon {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
   }
 
   .navbar-title {
-    font-size: 0.74rem;
+    font-size: 0.68rem;
   }
 
   .navbar-center {
-    gap: 0.35rem;
+    gap: 0.2rem;
   }
 
   .nav-action-btn {
-    width: 1.7rem;
-    height: 1.7rem;
-    min-width: 1.7rem;
-    font-size: 0.76rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    min-width: 1.6rem;
+    font-size: 0.72rem;
   }
 
   .navbar-right {
-    gap: 0.3rem;
+    gap: 0.2rem;
   }
 
   .navbar-level-badge {
-    padding: 0.12rem 0.3rem;
+    padding: 0.1rem 0.25rem;
   }
 
   .level-number {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
   }
 
   .audio-btn {
-    width: 1.7rem;
-    height: 1.7rem;
-    min-width: 1.7rem;
-    font-size: 0.76rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    min-width: 1.6rem;
+    font-size: 0.72rem;
+  }
+
+  .user-profile-pill {
+    width: 1.6rem !important;
+    height: 1.6rem !important;
+    min-width: 1.6rem !important;
   }
 
   .nav-signin-btn {
-    width: 1.7rem !important;
-    height: 1.7rem !important;
-    min-width: 1.7rem !important;
-    font-size: 0.72rem !important;
+    width: 1.6rem !important;
+    height: 1.6rem !important;
+    min-width: 1.6rem !important;
+    font-size: 0.68rem !important;
   }
 }
 
