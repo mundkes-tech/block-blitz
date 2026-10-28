@@ -3733,10 +3733,11 @@ button,
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
+    gap: 0.28rem;
     border-top: none;
     padding-top: 0;
-    margin: 0 auto;
+    margin-left: clamp(0.25rem, 1.8vw, 0.7rem);
+    margin-right: auto;
     flex-shrink: 0;
   }
 
@@ -3744,9 +3745,9 @@ button,
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.72rem;
-    height: 1.72rem;
-    min-width: 1.72rem;
+    width: 1.7rem;
+    height: 1.7rem;
+    min-width: 1.7rem;
     padding: 0 !important;
     font-size: 0.78rem;
     border-radius: 0.45rem;
@@ -3762,8 +3763,8 @@ button,
 
   .navbar-right {
     order: 3;
-    margin-left: 0;
-    gap: 0.3rem;
+    margin-left: auto;
+    gap: 0.25rem;
     display: flex;
     align-items: center;
     flex-shrink: 0;
@@ -3790,9 +3791,9 @@ button,
   }
 
   .audio-btn {
-    width: 1.72rem;
-    height: 1.72rem;
-    min-width: 1.72rem;
+    width: 1.7rem;
+    height: 1.7rem;
+    min-width: 1.7rem;
     font-size: 0.78rem;
     display: grid;
     place-items: center;
@@ -3801,9 +3802,9 @@ button,
   }
 
   .user-profile-pill {
-    width: 1.72rem !important;
-    height: 1.72rem !important;
-    min-width: 1.72rem !important;
+    width: 1.7rem !important;
+    height: 1.7rem !important;
+    min-width: 1.7rem !important;
     padding: 0 !important;
     border-radius: 50% !important;
     background: rgba(255, 255, 255, 0.08) !important;
@@ -3827,10 +3828,16 @@ button,
     place-items: center !important;
   }
 
+  .avatar-dot--guest {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(6, 182, 212, 0.35) 100%) !important;
+    color: #fff !important;
+    border: 1px solid rgba(16, 185, 129, 0.6) !important;
+  }
+
   .nav-signin-btn {
-    width: 1.72rem !important;
-    height: 1.72rem !important;
-    min-width: 1.72rem !important;
+    width: 1.7rem !important;
+    height: 1.7rem !important;
+    min-width: 1.7rem !important;
     padding: 0 !important;
     border-radius: 50% !important;
     font-size: 0.75rem !important;
@@ -3846,7 +3853,7 @@ button,
 
 @media (max-width: 400px) {
   .top-navbar {
-    padding: 0 0.2rem;
+    padding: 0 0.22rem;
   }
 
   .navbar-left {
@@ -3862,22 +3869,25 @@ button,
   }
 
   .navbar-center {
-    gap: 0.2rem;
+    gap: 0.18rem;
+    margin-left: clamp(0.18rem, 1vw, 0.4rem);
+    margin-right: auto;
   }
 
   .nav-action-btn {
-    width: 1.6rem;
-    height: 1.6rem;
-    min-width: 1.6rem;
-    font-size: 0.72rem;
+    width: 1.55rem;
+    height: 1.55rem;
+    min-width: 1.55rem;
+    font-size: 0.7rem;
   }
 
   .navbar-right {
-    gap: 0.2rem;
+    gap: 0.18rem;
+    margin-left: auto;
   }
 
   .navbar-level-badge {
-    padding: 0.1rem 0.25rem;
+    padding: 0.08rem 0.22rem;
   }
 
   .level-number {
@@ -3885,27 +3895,56 @@ button,
   }
 
   .audio-btn {
-    width: 1.6rem;
-    height: 1.6rem;
-    min-width: 1.6rem;
-    font-size: 0.72rem;
+    width: 1.55rem;
+    height: 1.55rem;
+    min-width: 1.55rem;
+    font-size: 0.7rem;
   }
 
   .user-profile-pill {
-    width: 1.6rem !important;
-    height: 1.6rem !important;
-    min-width: 1.6rem !important;
+    width: 1.55rem !important;
+    height: 1.55rem !important;
+    min-width: 1.55rem !important;
+  }
+
+  .avatar-dot {
+    font-size: 0.68rem !important;
   }
 
   .nav-signin-btn {
-    width: 1.6rem !important;
-    height: 1.6rem !important;
-    min-width: 1.6rem !important;
+    width: 1.55rem !important;
+    height: 1.55rem !important;
+    min-width: 1.55rem !important;
     font-size: 0.68rem !important;
   }
 }
 
-@media (max-width: 330px) {
+@media (max-width: 340px) {
+  .navbar-title {
+    font-size: 0.6rem;
+    letter-spacing: 0;
+  }
+
+  .navbar-center {
+    gap: 0.12rem;
+  }
+
+  .navbar-right {
+    gap: 0.12rem;
+  }
+
+  .nav-action-btn,
+  .audio-btn,
+  .user-profile-pill,
+  .nav-signin-btn {
+    width: 1.48rem !important;
+    height: 1.48rem !important;
+    min-width: 1.48rem !important;
+    font-size: 0.65rem !important;
+  }
+}
+
+@media (max-width: 320px) {
   .navbar-title {
     display: none;
   }

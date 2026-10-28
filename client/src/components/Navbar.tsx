@@ -141,13 +141,14 @@ export function Navbar({
           {soundEnabled ? '🔊' : '🔈'}
         </button>
 
-        {/* User Profile pill / Sign In button */}
+        {/* User Profile pill (Active player avatar or Guest profile icon) */}
         {currentUser ? (
           <button
             className="user-profile-pill"
             type="button"
             onClick={onOpenDashboard}
             title={`Active Player: ${currentUser.name} (${currentUser.email})`}
+            aria-label="Player Profile"
           >
             <span className="avatar-dot">
               {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'P'}
@@ -156,12 +157,14 @@ export function Navbar({
           </button>
         ) : (
           <button
-            className="nav-signin-btn"
+            className="user-profile-pill user-profile-pill--guest"
             type="button"
             onClick={onOpenAuth}
-            title="Sign in or register an account"
+            title="Guest Profile — Click to Sign In"
+            aria-label="User Profile - Sign In"
           >
-            🔐 <span className="nav-signin-text">Sign In</span>
+            <span className="avatar-dot avatar-dot--guest">👤</span>
+            <span className="user-pill-name">Sign In</span>
           </button>
         )}
       </div>
