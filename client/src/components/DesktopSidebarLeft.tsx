@@ -1,30 +1,26 @@
 type DesktopSidebarLeftProps = {
   currentLinesCleared: number
   targetLines?: number
-  rerollsLeft: number
-  hammersLeft: number
-  undosLeft: number
-  hammerActive: boolean
-  onUseReroll: () => void
-  onToggleHammer: () => void
-  onUseUndo: () => void
-  canUndo: boolean
   onOpenChallenge: () => void
+  onNewGame?: () => void
+  onHome?: () => void
+  score: number
+  bestScore: number
+  saveStatus: string
+  combo?: number
   locked?: boolean
 }
 
 export function DesktopSidebarLeft({
   currentLinesCleared,
   targetLines = 10,
-  rerollsLeft,
-  hammersLeft,
-  undosLeft,
-  hammerActive,
-  onUseReroll,
-  onToggleHammer,
-  onUseUndo,
-  canUndo,
   onOpenChallenge,
+  onNewGame,
+  onHome,
+  score,
+  bestScore,
+  saveStatus,
+  combo,
   locked = false,
 }: DesktopSidebarLeftProps) {
   const challengeProgress = Math.min(100, Math.round((currentLinesCleared / targetLines) * 100))
@@ -33,122 +29,28 @@ export function DesktopSidebarLeft({
   return (
     <aside
       className={`desktop-sidebar desktop-sidebar--left${locked ? ' desktop-sidebar--locked' : ''}`}
-      aria-label="Tactical boosters and daily mission"
+      aria-label="Run statistics, daily mission, and match controls"
     >
-      {/* Tactical Boosters Card */}
-      <div className="sidebar-card boosters-sidebar-card">
-        <header className="sidebar-card-header">
-          <div className="dock-title-group">
-            <span className="eyebrow">TACTICAL BOOSTERS</span>
-            <span className="dock-subhead">In-game power-ups</span>
-          </div>
-          <span className="badge-bonus" aria-hidden="true">POWER-UPS</span>
-        </header>
-
-        {hammerActive && (
-          <div className="hammer-active-callout animate-pulse" role="alert">
-            <span className="hammer-callout-icon" aria-hidden="true">🔨</span>
-            <div className="hammer-callout-text">
-              <strong>Hammer Active</strong>
-              <span>Click an occupied cell to clear it</span>
-            </div>
-            <button
-              type="button"
-              className="hammer-cancel-pill"
-              onClick={onToggleHammer}
-              title="Cancel hammer targeting (Escape)"
-            >
-              Cancel (Esc)
-            </button>
-          </div>
-        )}
-
-        <div className="boosters-list" role="group" aria-label="Available boosters">
-          {/* Reroll */}
-          <button
-            type="button"
-            className={`booster-item-btn${rerollsLeft === 0 || locked ? ' booster-item-btn--disabled' : ''}`}
-            onClick={onUseReroll}
-            disabled={rerollsLeft === 0 || locked}
-            title={rerollsLeft === 0 ? 'No rerolls remaining this match' : 'Redraw 3 new pieces'}
-            aria-disabled={rerollsLeft === 0 || locked}
-          >
-            <span className="booster-icon" aria-hidden="true">🔄</span>
-            <div className="booster-text">
-              <div className="booster-name-row">
-                <strong>Reroll Tray</strong>
-                <span className="booster-qty">{rerollsLeft} left</span>
-              </div>
-              <span className="booster-desc">
-                {rerollsLeft === 0 ? 'Exhausted' : 'Redraw fresh piece set'}
-              </span>
-            </div>
-          </button>
-
-          {/* Hammer */}
-          <button
-            type="button"
-            className={`booster-item-btn${
-              hammersLeft === 0 || locked ? ' booster-item-btn--disabled' : ''
-            }${hammerActive ? ' booster-item-btn--active' : ''}`}
-            onClick={onToggleHammer}
-            disabled={hammersLeft === 0 || locked}
-            aria-pressed={hammerActive}
-            aria-disabled={hammersLeft === 0 || locked}
-            title={hammersLeft === 0 ? 'No hammers remaining' : hammerActive ? 'Cancel hammer' : 'Clear any 1 block'}
-          >
-            <span className="booster-icon" aria-hidden="true">🔨</span>
-            <div className="booster-text">
-              <div className="booster-name-row">
-                <strong>Hammer Smash</strong>
-                <span className="booster-qty">{hammersLeft} left</span>
-              </div>
-              <span className="booster-desc">
-                {hammersLeft === 0
-                  ? 'Exhausted'
-                  : hammerActive
-                    ? 'Awaiting cell target…'
-                    : 'Smash 1 occupied cell'}
-              </span>
-            </div>
-          </button>
-
-          {/* Undo */}
-          <button
-            type="button"
-            className={`booster-item-btn${
-              !canUndo || undosLeft === 0 || locked ? ' booster-item-btn--disabled' : ''
-            }`}
-            onClick={onUseUndo}
-            disabled={!canUndo || undosLeft === 0 || locked}
-            aria-disabled={!canUndo || undosLeft === 0 || locked}
-            title={
-              undosLeft === 0
-                ? 'No undos remaining'
-                : !canUndo
-                  ? 'No previous move to undo'
-                  : 'Revert last placed block'
-            }
-          >
-            <span className="booster-icon" aria-hidden="true">↩️</span>
-            <div className="booster-text">
-              <div className="booster-name-row">
-                <strong>Undo Move</strong>
-                <span className="booster-qty">{undosLeft} left</span>
-              </div>
-              <span className="booster-desc">
-                {undosLeft === 0
-                  ? 'Exhausted'
-                  : !canUndo
-                    ? 'Make a move first'
-                    : 'Step back 1 placement'}
-              </span>
-            </div>
-          </button>
+      <div className="sidebar-stat-grid" aria-label="Current run statistics">
+        <div key={score} className="sidebar-stat-card sidebar-stat-card--score">
+          <span className="eyebrow">SCORE</span>
+          <strong>{score.toLocaleString()}</strong>
+        </div>
+        <div className="sidebar-stat-card">
+          <span className="eyebrow">BEST RECORD</span>
+          <strong>{bestScore.toLocaleString()}</strong>
+        </div>
+        <div className="sidebar-stat-card">
+          <span className="eyebrow">LINES</span>
+          <strong>{currentLinesCleared}</strong>
+        </div>
+        <div className="sidebar-stat-card sidebar-stat-card--status">
+          <span className="eyebrow">STATUS</span>
+          <strong>{saveStatus === 'saved' ? 'Synced' : saveStatus === 'saving' ? 'Syncing' : 'Ready'}</strong>
         </div>
       </div>
 
-      {/* Daily Challenge Widget */}
+      {/* Daily Mission Widget */}
       <div
         className="sidebar-card challenge-sidebar-card"
         onClick={onOpenChallenge}
@@ -194,6 +96,19 @@ export function DesktopSidebarLeft({
           </p>
         )}
       </div>
+
+      {(onNewGame || onHome) && (
+        <div className="sidebar-card session-controls-card">
+          <header className="sidebar-card-header">
+            <span className="eyebrow">MATCH CONTROLS</span>
+            {combo !== undefined && combo > 1 && <span className="badge-bonus">🔥 {combo}× COMBO</span>}
+          </header>
+          <div className="session-actions-grid">
+            {onNewGame && <button type="button" className="session-action-btn session-action-btn--restart" onClick={onNewGame} disabled={locked}>🔄 <span>Restart Run</span></button>}
+            {onHome && <button type="button" className="session-action-btn session-action-btn--home" onClick={onHome}>🏠 <span>Exit Home</span></button>}
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

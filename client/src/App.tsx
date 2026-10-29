@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import GameBoard, {
   type BoardEffect,
@@ -21,8 +21,8 @@ import { HomeScreen } from './components/HomeScreen'
 import { BOARD_SIZE, createEmptyBoard, type Board } from './game/board'
 import { clearCompletedLines } from './game/lines'
 import { canPlaceShape, placeShape } from './game/placement'
-import { generatePieces, type BlockPattern, type Piece } from './game/shapes'
-import { AnimatedNumber } from './ui/primitives'
+import { generatePieces, getShapeDimensions, type BlockPattern, type Piece } from './game/shapes'
+import { BlockPatternSvg } from './components/BlockPatternSvg'
 import { isGameOver } from './game/gameOver'
 import {
   calculatePlacementScore,
@@ -126,6 +126,7 @@ function App() {
   const [preview, setPreview] = useState<BoardPreview | null>(null)
   const [activeDragPieceId, setActiveDragPieceId] = useState<string | null>(null)
   const [returningPieceId, setReturningPieceId] = useState<string | null>(null)
+  const [dragCoords, setDragCoords] = useState<{ x: number; y: number; isTouch?: boolean } | null>(null)
   const [popups, setPopups] = useState<ScorePopup[]>([])
   const [particleTrigger, setParticleTrigger] = useState<ParticleTrigger | null>(null)
   const [liveAnnounce, setLiveAnnounce] = useState('')
@@ -525,6 +526,7 @@ function App() {
     const isTouch = event.pointerType === 'touch'
     activeDragRef.current = { piece, pointerId: event.pointerId, isTouch }
     setActiveDragPieceId(piece.id)
+    setDragCoords({ x: event.clientX, y: event.clientY, isTouch })
     playSound('blockPick')
 
     // On mobile touch, lift preview upward so thumb doesn't obscure the placement
@@ -535,6 +537,7 @@ function App() {
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const activeDrag = activeDragRef.current
     if (activeDrag?.pointerId === event.pointerId) {
+      setDragCoords({ x: event.clientX, y: event.clientY, isTouch: activeDrag.isTouch })
       const dragY = activeDrag.isTouch ? event.clientY - 65 : event.clientY
       updatePreview(activeDrag.piece, event.clientX, dragY)
     }
@@ -544,6 +547,7 @@ function App() {
     activeDragRef.current = null
     previewRef.current = null
     setActiveDragPieceId(null)
+    setDragCoords(null)
     setPreview(null)
   }, [])
 
@@ -916,6 +920,12 @@ function App() {
     }
   }, [location.pathname, phase, startNewGame, clearDrag])
 
+  useEffect(() => {
+    document.title = location.pathname === '/play' ? 'Block Blitz - Play' : 'BLOCK BLITZ — Puzzle Game'
+  }, [location.pathname])
+
+  const activeDragPiece = pieces.find((p) => p.id === activeDragPieceId) || null
+
   return (
     <div className={`app-root theme-${theme} phase-${phase}`}>
       {/* Polite Accessibility Live Region */}
@@ -1004,76 +1014,27 @@ function App() {
           {/* Zone 1: Left - Tactical Boosters & Daily Mission */}
           <DesktopSidebarLeft
             currentLinesCleared={totalLinesCleared}
-            rerollsLeft={rerollsLeft}
-            hammersLeft={hammersLeft}
-            undosLeft={undosLeft}
-            hammerActive={hammerActive}
-            onUseReroll={handleUseReroll}
-            onToggleHammer={handleToggleHammer}
-            onUseUndo={handleUseUndo}
-            canUndo={undoHistory.length > 0}
             onOpenChallenge={() => {
               navigate('/challenges')
               playSound('buttonClick')
             }}
+            onNewGame={startNewGame}
+            onHome={returnHome}
+            score={score}
+            bestScore={bestScore}
+            saveStatus={saveStatus}
+            combo={combo}
             locked={phase === 'gameOver'}
           />
 
           {/* Zone 2: Center - Arena, Dominant Score HUD & 8x8 Board */}
           <main className="game-shell" role="main">
-            {/* Dominant Telemetry HUD */}
-            <header className="game-hud" aria-label="Game telemetry">
-              <div className={`hud-card hud-score${combo > 1 ? ' hud-score--combo' : ''}`}>
-                <div className="hud-label-group">
-                  <span className="hud-label">SCORE</span>
-                  {combo > 1 && (
-                    <span className="hud-combo-badge pulse-combo" title={`Combo multiplier ${combo}x active`}>
-                      🔥 {combo}× COMBO
-                    </span>
-                  )}
-                </div>
-                <strong className="hud-value hud-value--score tabular-nums">
-                  <AnimatedNumber value={score} durationMs={260} />
-                </strong>
+            <div className="arena-context">
+              <div className="arena-context-copy">
+                <span className="eyebrow">SOLO ARENA</span>
+                <h1>Make your move</h1>
               </div>
-
-              <div className="hud-card hud-best">
-                <span className="hud-label">BEST RECORD</span>
-                <strong className="hud-value tabular-nums font-mono">
-                  {bestScore.toLocaleString()}
-                </strong>
-              </div>
-
-              <div className="hud-card hud-lines">
-                <span className="hud-label">LINES</span>
-                <strong className="hud-value text-teal tabular-nums font-mono">
-                  {totalLinesCleared}
-                </strong>
-              </div>
-
-              {/* Non-blocking sync status */}
-              <div
-                className="hud-card hud-status"
-                title={
-                  saveStatus === 'saving'
-                    ? 'Syncing result with server…'
-                    : saveStatus === 'saved'
-                      ? 'Score saved to server'
-                      : saveStatus === 'unavailable'
-                        ? 'Operating in local offline mode'
-                        : 'Sync status'
-                }
-              >
-                <span className="hud-label">STATUS</span>
-                <span className={`save-status-pill save-status-pill--${saveStatus}`}>
-                  {saveStatus === 'saving' && '● Syncing'}
-                  {saveStatus === 'saved' && '✓ Synced'}
-                  {saveStatus === 'unavailable' && 'Local Only'}
-                  {saveStatus === 'error' && '⚠️ Failed'}
-                  {saveStatus === 'idle' && 'Ready'}
-                </span>
-              </div>
-            </header>
+            </div>
 
             {/* Hammer active mode banner */}
             {hammerActive && (
@@ -1102,6 +1063,11 @@ function App() {
 
             {/* 8x8 Board with Particle Explosion Canvas */}
             <div className={`board-outer-wrapper${phase === 'gameOver' ? ' board-outer-wrapper--locked' : ''}`}>
+              {blocksPlaced === 0 && (
+                <div className="empty-board-hint" aria-hidden="true">
+                  Drag a block onto the grid to begin
+                </div>
+              )}
               <ParticleCanvas trigger={particleTrigger} />
               <GameBoard
                 board={board}
@@ -1158,41 +1124,42 @@ function App() {
               </button>
             </div>
 
-            {/* Mobile Piece Dock (positioned directly in thumb zone) */}
-            <div className="mobile-piece-tray-wrapper">
-              <PieceTray
-                pieces={pieces}
-                activePieceId={activeDragPieceId}
-                returningPieceId={returningPieceId}
-                locked={phase === 'gameOver'}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
-              />
-            </div>
-
-            {/* Return Home Button */}
-            <div className="game-bottom-actions">
-              <button className="text-pill-btn" type="button" onClick={returnHome}>
-                ← Back to Home
-              </button>
-            </div>
-          </main>
-
-          {/* Zone 3: Right - Generated Blocks Arsenal & Live Match Feed */}
-          <div className="desktop-right-column">
+            {/* Blocks Arsenal Dock (Centered directly under the 8x8 Board) */}
             <PieceTray
               pieces={pieces}
               activePieceId={activeDragPieceId}
               returningPieceId={returningPieceId}
               locked={phase === 'gameOver'}
+              compact={false}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerCancel}
             />
 
+            {/* Mobile Bottom Quick Actions */}
+            <div className="game-bottom-actions">
+              <button
+                className="text-pill-btn"
+                type="button"
+                onClick={startNewGame}
+                title="Restart with a new game session"
+              >
+                🔄 Restart Run
+              </button>
+              <button
+                className="text-pill-btn"
+                type="button"
+                onClick={returnHome}
+                title="Return to home screen"
+              >
+                ← Back to Home
+              </button>
+            </div>
+          </main>
+
+          {/* Zone 3: Right - Global Arena Leaderboard, Live Feed & Controls */}
+          <div className="desktop-right-column">
             <DesktopSidebarRight
               currentUserId={currentUserId}
               matchLogs={matchLogs}
@@ -1200,9 +1167,52 @@ function App() {
                 navigate('/leaderboard')
                 playSound('buttonClick')
               }}
+              rerollsLeft={rerollsLeft}
+              hammersLeft={hammersLeft}
+              undosLeft={undosLeft}
+              hammerActive={hammerActive}
+              onUseReroll={handleUseReroll}
+              onToggleHammer={handleToggleHammer}
+              onUseUndo={handleUseUndo}
+              canUndo={undoHistory.length > 0}
               locked={phase === 'gameOver'}
             />
           </div>
+
+          {/* Floating Drag Avatar (Follows cursor/touch seamlessly) */}
+          {activeDragPiece && dragCoords && (
+            <div
+              className="floating-drag-piece"
+              style={{
+                left: `${dragCoords.x}px`,
+                top: `${dragCoords.isTouch ? dragCoords.y - 65 : dragCoords.y}px`,
+              }}
+              aria-hidden="true"
+            >
+              <div
+                className="piece-grid"
+                style={{
+                  '--piece-rows': getShapeDimensions(activeDragPiece.shape).rows,
+                  '--piece-cols': getShapeDimensions(activeDragPiece.shape).cols,
+                } as CSSProperties}
+              >
+                {activeDragPiece.shape.cells.map(({ row, col }) => (
+                  <span
+                    className="piece-cell piece-cell--dragging"
+                    key={`floating-${row}-${col}`}
+                    style={{
+                      gridRow: row + 1,
+                      gridColumn: col + 1,
+                      backgroundColor: activeDragPiece.shape.color,
+                    }}
+                  >
+                    <BlockPatternSvg pattern={activeDragPiece.shape.pattern} />
+                    <span className="piece-cell-shine" aria-hidden="true" />
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

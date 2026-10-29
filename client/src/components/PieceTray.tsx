@@ -1,23 +1,26 @@
 import type { CSSProperties, PointerEvent } from 'react'
 import type { Piece } from '../game/shapes'
 import { getShapeDimensions } from '../game/shapes'
+import { BlockPatternSvg } from './BlockPatternSvg'
 
 type PieceTrayProps = {
   pieces: Piece[]
   activePieceId?: string | null
   returningPieceId?: string | null
   locked?: boolean
+  compact?: boolean
   onPointerDown: (piece: Piece, event: PointerEvent<HTMLDivElement>) => void
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void
 }
 
-function PieceTray({
+export function PieceTray({
   pieces,
   activePieceId,
   returningPieceId,
   locked = false,
+  compact = false,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -28,23 +31,26 @@ function PieceTray({
   const slots = Array.from({ length: maxSlots }, (_, index) => pieces[index] || null)
 
   return (
-    <aside
-      className={`desktop-sidebar desktop-sidebar--right piece-dock-sidebar${locked ? ' piece-dock-sidebar--locked' : ''}`}
+    <section
+      className={`piece-dock-container${locked ? ' piece-dock-container--locked' : ''}${
+        compact ? ' piece-dock-container--compact' : ''
+      }`}
       aria-label="Generated blocks dock"
     >
-      <div className="sidebar-card piece-dock-card">
-        <header className="sidebar-card-header">
-          <div className="dock-title-group">
-            <span className="eyebrow">⚡ BLOCKS ARSENAL</span>
-            <span className="dock-subhead">Drag to grid</span>
-          </div>
-          <span
-            className={`piece-count-badge${pieces.length === 0 ? ' piece-count-badge--empty' : ''}`}
-            aria-live="polite"
-          >
-            {pieces.length} / 3 READY
-          </span>
-        </header>
+      <div className="piece-dock-card">
+        {!compact && (
+          <header className="piece-dock-header">
+            <div className="dock-title-group">
+              <span className="eyebrow">BLOCKS ARSENAL</span>
+            </div>
+            <span
+              className={`piece-count-badge${pieces.length === 0 ? ' piece-count-badge--empty' : ''}`}
+              aria-live="polite"
+            >
+              {pieces.length} / 3 READY
+            </span>
+          </header>
+        )}
 
         <div className="piece-dock-list" role="group" aria-label="Available pieces for placement">
           {slots.map((piece, slotIdx) => {
@@ -109,7 +115,8 @@ function PieceTray({
                           backgroundColor: piece.shape.color,
                         }}
                       >
-                        {/* Subtle tactile marker */}
+                        {/* Tactile pattern texture for color-blind accessibility */}
+                        <BlockPatternSvg pattern={piece.shape.pattern} />
                         <span className="piece-cell-shine" aria-hidden="true" />
                       </span>
                     ))}
@@ -120,12 +127,13 @@ function PieceTray({
           })}
         </div>
 
-        <footer className="piece-dock-tip">
-          <span className="dock-tip-icon" aria-hidden="true">💡</span>
-          <p className="sidebar-hint">Tip: Clearing multiple lines simultaneously unleashes massive combo streaks!</p>
-        </footer>
+        {!compact && (
+          <footer className="piece-dock-tip">
+            <p className="sidebar-hint">Drag blocks onto the 8×8 grid</p>
+          </footer>
+        )}
       </div>
-    </aside>
+    </section>
   )
 }
 

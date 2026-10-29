@@ -72,7 +72,8 @@ export function Navbar({
     <>
       <header className="top-navbar" role="banner">
         {/* Brand Logo & Name */}
-        <div
+        <a
+          href="/"
           className="navbar-left"
           onClick={() => handleAction(onHome)}
           onKeyDown={(e) => {
@@ -86,11 +87,11 @@ export function Navbar({
           title="Return to Home screen"
           aria-label="BLOCK BLITZ Home"
         >
-          <span className="navbar-logo-icon" aria-hidden="true">🧩</span>
-          <div className="navbar-branding">
-            <span className="navbar-title">BLOCK BLITZ</span>
+          <img className="navbar-logo-icon" src="/favicon.svg" alt="" />
+          <div className="navbar-branding" aria-label="Block Blitz">
+            <span className="navbar-title"><span className="navbar-title-block">BLOCK</span> <span className="navbar-title-blitz">BLITZ</span></span>
           </div>
-        </div>
+        </a>
 
         {/* Center Desktop Navigation */}
         <nav className="navbar-center" aria-label="Game navigation">

@@ -12,6 +12,14 @@ type DesktopSidebarRightProps = {
   currentUserId?: string | null
   matchLogs: MatchLogEntry[]
   onOpenLeaderboard: () => void
+  rerollsLeft: number
+  hammersLeft: number
+  undosLeft: number
+  hammerActive: boolean
+  onUseReroll: () => void
+  onToggleHammer: () => void
+  onUseUndo: () => void
+  canUndo: boolean
   locked?: boolean
 }
 
@@ -19,6 +27,14 @@ export function DesktopSidebarRight({
   currentUserId,
   matchLogs,
   onOpenLeaderboard,
+  rerollsLeft,
+  hammersLeft,
+  undosLeft,
+  hammerActive,
+  onUseReroll,
+  onToggleHammer,
+  onUseUndo,
+  canUndo,
   locked = false,
 }: DesktopSidebarRightProps) {
   const [topEntries, setTopEntries] = useState<LeaderboardEntry[]>([])
@@ -54,8 +70,42 @@ export function DesktopSidebarRight({
   return (
     <aside
       className={`desktop-sidebar desktop-sidebar--right${locked ? ' desktop-sidebar--locked' : ''}`}
-      aria-label="Global leaderboard and match event feed"
+      aria-label="Tactical boosters, leaderboard, and match event feed"
     >
+      <div className="sidebar-card boosters-sidebar-card">
+        <header className="sidebar-card-header">
+          <div className="dock-title-group">
+            <span className="eyebrow">TACTICAL BOOSTERS</span>
+            <span className="dock-subhead">In-game power-ups</span>
+          </div>
+          <span className="badge-bonus" aria-hidden="true">POWER-UPS</span>
+        </header>
+        {hammerActive && (
+          <div className="hammer-active-callout animate-pulse" role="alert">
+            <span className="hammer-callout-icon" aria-hidden="true">🔨</span>
+            <span className="hammer-callout-text"><strong>Hammer active</strong><span>Choose a block</span></span>
+            <button type="button" className="hammer-cancel-pill" onClick={onToggleHammer}>Cancel</button>
+          </div>
+        )}
+        <div className="boosters-list" role="group" aria-label="Available boosters">
+          <button type="button" className={`booster-item-btn${rerollsLeft === 0 || locked ? ' booster-item-btn--disabled' : ''}`} onClick={onUseReroll} disabled={rerollsLeft === 0 || locked}>
+            <span className="booster-icon" aria-hidden="true">🔄</span>
+            <span className="booster-text"><strong>Reroll Tray</strong><span>Redraw pieces</span></span>
+            <span className="booster-qty">{rerollsLeft} left</span>
+          </button>
+          <button type="button" className={`booster-item-btn${hammersLeft === 0 || locked ? ' booster-item-btn--disabled' : ''}${hammerActive ? ' booster-item-btn--active' : ''}`} onClick={onToggleHammer} disabled={hammersLeft === 0 || locked} aria-pressed={hammerActive}>
+            <span className="booster-icon" aria-hidden="true">🔨</span>
+            <span className="booster-text"><strong>Hammer Smash</strong><span>{hammerActive ? 'Choose a block' : 'Clear one block'}</span></span>
+            <span className="booster-qty">{hammersLeft} left</span>
+          </button>
+          <button type="button" className={`booster-item-btn${!canUndo || undosLeft === 0 || locked ? ' booster-item-btn--disabled' : ''}`} onClick={onUseUndo} disabled={!canUndo || undosLeft === 0 || locked}>
+            <span className="booster-icon" aria-hidden="true">↩️</span>
+            <span className="booster-text"><strong>Undo Move</strong><span>{canUndo ? 'Step back once' : 'Make a move first'}</span></span>
+            <span className="booster-qty">{undosLeft} left</span>
+          </button>
+        </div>
+      </div>
+
       {/* Live Mini Leaderboard Card */}
       <div className="sidebar-card leaderboard-sidebar-card">
         <header className="sidebar-card-header">
@@ -125,12 +175,11 @@ export function DesktopSidebarRight({
             <span className="eyebrow">MATCH TELEMETRY</span>
             <span className="dock-subhead">Live Action Feed</span>
           </div>
-          <span className="telemetry-live-dot" aria-live="polite">● LIVE</span>
         </header>
 
         <div className="matchlog-list" role="log" aria-label="Recent match actions">
           {matchLogs.length === 0 ? (
-            <p className="sidebar-hint">Place blocks and clear rows/columns to trigger combo events.</p>
+            <p className="sidebar-hint">Clear lines to trigger combo events. Clearing multiple lines unleashes combo streaks!</p>
           ) : (
             matchLogs.slice(0, 6).map((log) => (
               <div key={log.id} className="matchlog-item animate-fade-in">
@@ -148,6 +197,7 @@ export function DesktopSidebarRight({
           )}
         </div>
       </div>
+
     </aside>
   )
 }
