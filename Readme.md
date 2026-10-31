@@ -47,6 +47,107 @@ Express API (server/src)
 PostgreSQL
 ```
 
+## Data-flow diagrams and visual presentation
+
+### DFD level 0: system context
+
+```mermaid
+flowchart TB
+    Player["Player"]
+    System(("Block Blitz"))
+    Identity["Authentication<br/>register / login / session"]
+    GameData["Game data<br/>sessions / scores / history"]
+    Ranking["Leaderboard and statistics"]
+
+    Player -->|"Pointer, keyboard,<br/>and settings input"| System
+    System -->|"Credentials / JWT"| Identity
+    Identity -->|"Identity and token"| System
+    System -->|"Validated match result"| GameData
+    GameData -->|"History and aggregates"| Ranking
+    Ranking -->|"Ranks, stats, dashboard"| System
+```
+
+### DFD level 1: match lifecycle
+
+```mermaid
+flowchart LR
+    Start["Start match"]
+    Tray["Generate tray pieces"]
+    Drag["Pointer drag"]
+    Map["Map final pointer<br/>to board anchor"]
+    Validate{"canPlace<br/>bounds + collision"}
+    Place["Place piece"]
+    Clear["Clear completed<br/>rows / columns"]
+    Score["Update score,<br/>combo, boosters"]
+    More{"Any legal move<br/>remaining?"}
+    Finish["Finish match"]
+    Save["Persist authenticated<br/>result or retry locally"]
+
+    Start --> Tray --> Drag --> Map --> Validate
+    Validate -->|"Invalid"| Drag
+    Validate -->|"Valid"| Place --> Clear --> Score --> More
+    More -->|"Yes"| Tray
+    More -->|"No"| Finish --> Save
+```
+
+The preview is visual only. Placement is recalculated from the final pointer
+coordinates on release, and the same pure `canPlace` rule is used for preview,
+drop validation, and game-over detection.
+
+### Client presentation and screen map
+
+```mermaid
+flowchart TB
+    Header["Shared AppHeader<br/>brand · navigation · level · theme · audio · profile"]
+    Home["Home / Arcade Lobby"]
+    Play["Play screen"]
+    Auth["Sign in / Register modal"]
+    Ranks["Leaderboard"]
+    Stats["Player dashboard"]
+    Missions["Daily missions"]
+    Badges["Achievements"]
+    GameOver["Game-over summary"]
+
+    Header --> Home
+    Header --> Ranks
+    Header --> Stats
+    Header --> Missions
+    Header --> Badges
+    Home -->|"Play"| Play
+    Home -->|"Sign in"| Auth
+    Play -->|"No legal moves"| GameOver
+    GameOver -->|"Save when signed in"| Auth
+    Auth -->|"Authenticated session"| Home
+```
+
+### Responsive visual presentation
+
+| Viewport | Header presentation | Main presentation |
+|---|---|---|
+| Desktop (`>= 1100px`) | Fixed shared header with navigation pills, level chip, theme, audio, and profile | Three-column lobby: player card, centered hero board, top ranks |
+| Tablet (`640–1099px`) | Fixed header with menu and settings controls | Centered hero with stacked content and compact rails |
+| Mobile (`< 640px`) | Brand, level, settings, and profile controls; bottom navigation dock | Single-column hero, player card, ranks card, and How It Works |
+
+The visual language is consistent across screens:
+
+- Deep navy surfaces with emerald accents and restrained borders.
+- Emerald gradient typography for the `BLITZ` wordmark and hero title.
+- 40px header controls and at least 44px touch targets for interactive actions.
+- Shared audio, theme, and settings controls across the home and play layouts.
+- Focus-visible rings, reduced-motion support, and keyboard-accessible dialogs,
+  switches, and game actions.
+
+### Core client modules
+
+| Area | Primary modules |
+|---|---|
+| Shared shell | [`client/src/components/AppHeader.tsx`](client/src/components/AppHeader.tsx), [`client/src/components/appHeader.css`](client/src/components/appHeader.css) |
+| Home presentation | [`client/src/components/HomeScreen.tsx`](client/src/components/HomeScreen.tsx), [`client/src/components/arcadeLobby.css`](client/src/components/arcadeLobby.css) |
+| Gameplay | [`client/src/components/GameBoard.tsx`](client/src/components/GameBoard.tsx), [`client/src/components/PieceTray.tsx`](client/src/components/PieceTray.tsx) |
+| Placement | [`client/src/game/placement.ts`](client/src/game/placement.ts), [`client/src/game/dragGeometry.ts`](client/src/game/dragGeometry.ts) |
+| Authentication | [`client/src/components/AuthModal.tsx`](client/src/components/AuthModal.tsx), [`server/src/routes/auth.ts`](client/src/routes/auth.ts) |
+| Persistence | [`client/src/services/gameSessionsApi.ts`](client/src/services/gameSessionsApi.ts), [`server/src/services/gameSessions.ts`](server/src/services/gameSessions.ts) |
+
 ## Tech stack
 
 React, TypeScript, Vite, Express 5, PostgreSQL, `pg`, Node.js, and Web Audio.
@@ -94,7 +195,7 @@ Committed templates are [`server/.env.example`](server/.env.example) and
 
 ## API
 
-All protected endpoints require `Authorization: Bearer <JWT>`.
+All protected endpoints require an Authorization header containing a bearer token.
 
 | Method | Path | Auth | Body/query | Success and errors |
 |---|---|---|---|---|
@@ -148,14 +249,23 @@ network failure, or server error, the client stores a versioned entry in
 ID is reused. Successful entries and non-retryable 4xx entries are removed.
 Anonymous matches never call the API.
 
-## Screenshots
+## Visual documentation
 
-Add deployment screenshots under [`docs/screenshots/`](docs/screenshots/):
+Store product screenshots under [`docs/screenshots/`](docs/screenshots/) using
+these names:
 
-- `home.png`
-- `gameplay.png`
-- `game-over.png`
-- `leaderboard.png`
+| File | Capture |
+|---|---|
+| `home-desktop.png` | Home lobby at 1366×768 or larger |
+| `home-mobile.png` | Home lobby at 390px wide |
+| `gameplay-desktop.png` | Active board with tray and placement preview |
+| `game-over.png` | Game-over summary and score actions |
+| `leaderboard.png` | Public leaderboard and rank states |
+| `settings.png` | Audio/theme settings popover or mobile sheet |
+
+For design reviews, capture desktop at `1366×768` and mobile at `390×844`.
+These sizes cover the primary hero, fixed header, rails, sticky play action,
+responsive settings, and bottom navigation behavior.
 
 ## Deployment
 
