@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Eye, EyeOff, X } from 'lucide-react'
 import { login, register } from '../services/authApi'
 import type { UserProfile } from '../services/gameSessionsApi'
+import './authModal.css'
 
 type AuthModalProps = {
   isOpen: boolean
@@ -20,7 +22,10 @@ export function AuthModal({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const modalRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!isOpen) return
@@ -28,6 +33,13 @@ export function AuthModal({
       if (e.key === 'Escape') {
         e.stopPropagation()
         onClose()
+      }
+      if (e.key === 'Tab' && modalRef.current) {
+        const nodes = modalRef.current.querySelectorAll<HTMLElement>('button, input')
+        const first = nodes[0]
+        const last = nodes[nodes.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -39,19 +51,20 @@ export function AuthModal({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+    setFieldErrors({})
 
     if (mode === 'register' && (!name.trim() || name.trim().length < 2)) {
-      setError('Player name must be at least 2 characters.')
+      setFieldErrors({ name: 'Player name must be at least 2 characters.' })
       return
     }
 
     if (!email.trim() || !email.includes('@')) {
-      setError('Please enter a valid email address.')
+      setFieldErrors({ email: 'Please enter a valid email address.' })
       return
     }
 
     if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters long.')
+      setFieldErrors({ password: 'Password must be at least 6 characters long.' })
       return
     }
 
@@ -82,78 +95,79 @@ export function AuthModal({
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="modal-card auth-card animate-scale-up">
-        <header className="modal-header">
+      <div className="bb-auth-modal" ref={modalRef}>
+        <header className="bb-auth-modal__header">
           <div className="modal-title-group">
-            <span className="eyebrow">PLAYER IDENTITY</span>
-            <h2 id="auth-modal-title">
-              {mode === 'login' ? '🔐 SIGN IN' : '⚡ REGISTER BLITZER'}
-            </h2>
+            <span className="bb-auth-modal__eyebrow">PLAYER IDENTITY</span>
+            <h2 id="auth-modal-title">{mode === 'login' ? 'Sign in' : 'Create account'}</h2>
           </div>
           <button
-            className="icon-close-btn"
+            className="bb-auth-modal__close"
             type="button"
             onClick={onClose}
             aria-label="Close authentication modal"
           >
-            ✕
+            <X size={20} />
           </button>
         </header>
 
         {/* Tab switcher: Login / Register */}
-        <div className="auth-tabs" role="tablist" aria-label="Authentication modes">
+        <div className="bb-auth-modal__tabs" role="tablist" aria-label="Authentication modes">
           <button
             type="button"
             role="tab"
             aria-selected={mode === 'login'}
-            className={`tab-btn${mode === 'login' ? ' tab-btn--active' : ''}`}
+            className={`bb-auth-modal__tab${mode === 'login' ? ' is-active' : ''}`}
+            onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); setMode('register') } }}
             onClick={() => {
               setMode('login')
               setError(null)
             }}
           >
-            Sign In
+            Sign in
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={mode === 'register'}
-            className={`tab-btn${mode === 'register' ? ' tab-btn--active' : ''}`}
+            className={`bb-auth-modal__tab${mode === 'register' ? ' is-active' : ''}`}
+            onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); setMode('login') } }}
             onClick={() => {
               setMode('register')
               setError(null)
             }}
           >
-            Register Account
+            Register
           </button>
         </div>
 
         {error && (
-          <div className="auth-error-banner animate-fade-in" role="alert">
-            <span aria-hidden="true">⚠️</span>
+          <div className="bb-auth-modal__error" role="alert">
             <span>{error}</span>
           </div>
         )}
 
-        <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <form className="bb-auth-modal__form" onSubmit={handleSubmit} noValidate>
           {mode === 'register' && (
-            <div className="form-group">
-              <label htmlFor="auth-name">Player Name / Handle</label>
+            <div className="bb-auth-modal__field">
+              <label htmlFor="auth-name">Player name</label>
               <input
                 id="auth-name"
                 type="text"
-                autoComplete="nickname"
+                autoComplete="name"
                 placeholder="e.g. NeonStriker"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                aria-describedby={fieldErrors.name ? 'auth-name-error' : undefined}
                 required
                 maxLength={30}
               />
+              {fieldErrors.name && <small id="auth-name-error" className="bb-auth-modal__field-error">{fieldErrors.name}</small>}
             </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="auth-email">Email Address</label>
+          <div className="bb-auth-modal__field">
+            <label htmlFor="auth-email">Email</label>
             <input
               id="auth-email"
               type="email"
@@ -161,47 +175,55 @@ export function AuthModal({
               placeholder="player@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
               required
             />
+            {fieldErrors.email && <small id="auth-email-error" className="bb-auth-modal__field-error">{fieldErrors.email}</small>}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="auth-password">Password (min 6 characters)</label>
+          <div className="bb-auth-modal__field">
+            <label htmlFor="auth-password">Password</label>
+            <div className="bb-auth-modal__password">
             <input
               id="auth-password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              aria-describedby={mode === 'register' ? 'auth-password-hint' : fieldErrors.password ? 'auth-password-error' : undefined}
               required
               minLength={6}
             />
+            <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+            </div>
+            {mode === 'register' && <small id="auth-password-hint" className="bb-auth-modal__hint">min 6 characters</small>}
+            {fieldErrors.password && <small id="auth-password-error" className="bb-auth-modal__field-error">{fieldErrors.password}</small>}
           </div>
 
           <button
             type="submit"
-            className="primary-button btn-large w-full mt-4"
+            className="bb-auth-modal__submit"
             disabled={loading}
           >
-            {loading ? 'Authenticating…' : mode === 'login' ? 'Sign In to Play' : 'Create Blitzer Account'}
+            {loading ? <span className="bb-auth-modal__spinner" aria-label="Loading" /> : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
         </form>
 
-        <footer className="auth-footer">
-          <p className="auth-hint">
+        <footer className="bb-auth-modal__footer">
+          <p>
             {mode === 'login'
-              ? "Don't have an account yet? "
-              : 'Already have an existing profile? '}
+              ? 'New here? '
+              : 'Already have an account? '}
             <button
               type="button"
-              className="auth-switch-link"
+              className="bb-auth-modal__switch"
               onClick={() => {
                 setMode(mode === 'login' ? 'register' : 'login')
                 setError(null)
               }}
             >
-              {mode === 'login' ? 'Register here' : 'Sign in'}
+              {mode === 'login' ? 'Create an account' : 'Sign in'}
             </button>
           </p>
         </footer>

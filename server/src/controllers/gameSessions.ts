@@ -11,13 +11,15 @@ import {
   listLeaderboard,
   listUsers,
 } from '../services/gameSessions.js'
+import type { AuthenticatedRequest } from '../middleware/auth.js'
 
 export function listSessionsController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const result = await listCompletedGameSessions(
       pool,
       req.query.page,
       req.query.pageSize,
+      req.user?.id,
     )
 
     res.json({
@@ -26,6 +28,7 @@ export function listSessionsController(pool: Pool | null) {
         items: result.items.map((session) => ({
           sessionId: session.sessionId,
           userId: session.userId,
+          status: session.status,
           score: session.score,
           linesCleared: session.linesCleared,
           blocksPlaced: session.blocksPlaced,
@@ -46,9 +49,8 @@ export function listSessionsController(pool: Pool | null) {
 }
 
 export function statsController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
-    const userId = req.query.userId as string | undefined
-    const stats = await getGameSessionStats(pool, userId)
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const stats = await getGameSessionStats(pool, req.user?.id)
 
     res.json({
       success: true,
@@ -97,14 +99,8 @@ export function leaderboardController(pool: Pool | null) {
 }
 
 export function myRankController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
-    const userId = req.query.userId as string | undefined
-    if (!userId) {
-      res.json({ success: true, data: null })
-      return
-    }
-
-    const rankInfo = await getPlayerRank(pool, userId)
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const rankInfo = await getPlayerRank(pool, req.user?.id)
     res.json({
       success: true,
       data: rankInfo,
@@ -113,8 +109,12 @@ export function myRankController(pool: Pool | null) {
 }
 
 export function createSessionController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
-    const session = await createGameSession(pool, req.body?.userId)
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new Error('Authenticated user missing')
+    }
+    const requestId = req.header('X-Request-Id') ?? undefined
+    const session = await createGameSession(pool, req.user.id, requestId)
 
     res.status(201).json({
       success: true,
@@ -128,7 +128,7 @@ export function createSessionController(pool: Pool | null) {
 }
 
 export function completeSessionController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const session = await completeGameSession(
       pool,
       req.params.sessionId,
@@ -139,6 +139,8 @@ export function completeSessionController(pool: Pool | null) {
       req.body?.duration ?? req.body?.gameDuration,
       req.body?.rowsCleared,
       req.body?.columnsCleared,
+      req.user?.id,
+      req.body?.moveLog,
     )
 
     res.json({
@@ -170,7 +172,7 @@ export function listUsersController(pool: Pool | null) {
 }
 
 export function userProfileController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const userId = (req.query.userId ?? req.params.userId) as string
     const user = await getUserProfile(pool, userId)
     res.json({
@@ -181,11 +183,10 @@ export function userProfileController(pool: Pool | null) {
 }
 
 export function userHistoryController(pool: Pool | null) {
-  return async (req: Request, res: Response): Promise<void> => {
-    const userId = req.query.userId as string | undefined
+  return async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const result = await getUserGameHistory(
       pool,
-      userId,
+      req.user?.id,
       req.query.page,
       req.query.pageSize,
     )

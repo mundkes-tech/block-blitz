@@ -8,6 +8,7 @@ import { ApiError } from '../src/errors.js'
 import {
   completeGameSession,
   getGameSessionStats,
+  getUserProfile,
   getUserGameHistory,
   listCompletedGameSessions,
   listLeaderboard,
@@ -113,7 +114,7 @@ test('completes an in-progress session with parameterized values', async () => {
   assert.match(queries[0].text, /WHERE session_id = \$1 AND status = 'in_progress'/)
 })
 
-test('returns not found and conflict for unknown and completed sessions', async () => {
+test('returns not found and idempotently returns completed sessions', async () => {
   const unknownPool = createPool(async (text) => {
     if (text.startsWith('UPDATE')) return createMockQueryResult([])
     return createMockQueryResult([])
@@ -127,10 +128,8 @@ test('returns not found and conflict for unknown and completed sessions', async 
     completeGameSession(unknownPool, validSessionId, 0, 0),
     (error: unknown) => error instanceof ApiError && error.statusCode === 404,
   )
-  await assert.rejects(
-    completeGameSession(completedPool, validSessionId, 0, 0),
-    (error: unknown) => error instanceof ApiError && error.statusCode === 409,
-  )
+  const completed = await completeGameSession(completedPool, validSessionId, 0, 0)
+  assert.equal(completed.status, 'completed')
 })
 
 test('uses completed-only parameterized pagination for history and leaderboard', async () => {
@@ -159,9 +158,12 @@ test('uses completed-only parameterized pagination for history and leaderboard',
   assert.equal(history.items.length, 1)
   assert.equal(history.totalPages, 3)
   assert.equal(leaderboard.items[0].rank, 2)
-  assert.ok(calls.every(({ text }) => text.includes("status = 'completed'")))
-  assert.deepEqual(calls[0].values, [1, 1])
-  assert.deepEqual(calls[2].values, [1, 1])
+  assert.ok(calls.every(({ text }) =>
+    text.includes("status = 'completed'") ||
+    text.includes("status IN ('completed', 'flagged')") ||
+    text.includes('valid_games'),
+  ))
+  assert.ok(calls.some(({ text }) => text.includes('LIMIT $1 OFFSET $2')))
 })
 
 test('returns zero-safe aggregate statistics for an empty result', async () => {
@@ -184,6 +186,73 @@ test('returns zero-safe aggregate statistics for an empty result', async () => {
     totalLinesCleared: 0,
     mostRecentCompletedAt: null,
   })
+})
+
+test('excludes flagged sessions from valid aggregates and leaderboards', async () => {
+    const queries: string[] = []
+    const pool = createPool(async (text) => {
+      queries.push(text)
+      if (text.includes('COUNT(*)')) return createMockQueryResult([{ total: '0' }])
+      return createMockQueryResult([])
+    })
+
+    await listLeaderboard(pool, 1, 20)
+    await getGameSessionStats(pool, validSessionId)
+    await getUserProfile(pool, validSessionId)
+
+    assert.ok(queries.some((query) => query.includes('FROM valid_games')))
+    assert.ok(queries.some((query) => query.includes('LEFT JOIN valid_games')))
+    assert.equal(queries.some((query) => query.includes("status = 'flagged'")), false)
+})
+
+test('completes concurrent requests once inside a PostgreSQL transaction', async () => {
+  let status: 'in_progress' | 'completed' = 'in_progress'
+  let lockRead = false
+  let aggregateUpdates = 0
+  const row = {
+    session_id: validSessionId,
+    user_id: validSessionId,
+    status,
+    started_at: new Date('2026-01-01T00:00:00Z'),
+    completed_at: new Date('2026-01-01T00:01:00Z'),
+    score: 120,
+    lines_cleared: 1,
+    blocks_placed: 1,
+    highest_combo: 1,
+    duration: 10,
+  }
+  const client = {
+    query: async (text: string) => {
+      if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return createMockQueryResult([])
+      if (text.includes('FOR UPDATE')) {
+        if (lockRead) return createMockQueryResult([{ ...row, status: 'completed' }])
+        lockRead = true
+        return createMockQueryResult([{ ...row, status }])
+      }
+      if (text.startsWith('UPDATE game_sessions')) {
+        status = 'completed'
+        return createMockQueryResult([{ ...row, status }])
+      }
+      if (text.startsWith('UPDATE users')) {
+        aggregateUpdates += 1
+        return createMockQueryResult([])
+      }
+      throw new Error(`Unexpected query: ${text}`)
+    },
+    release: () => undefined,
+  }
+  const pool = { connect: async () => client } as unknown as Pool
+  const results = await Promise.all([
+    completeGameSession(pool, validSessionId, 120, 1, 1, 1, 10, 0, 0, validSessionId, [
+      { shapeId: 'square', row: 0, col: 0 },
+    ]),
+    completeGameSession(pool, validSessionId, 120, 1, 1, 1, 10, 0, 0, validSessionId, [
+      { shapeId: 'square', row: 0, col: 0 },
+    ]),
+  ])
+  assert.equal(results[0].status, 'completed')
+  assert.equal(results[1].status, 'completed')
+  assert.equal(aggregateUpdates, 1)
 })
 
 test('returns a safe error when the database is unavailable', async () => {
@@ -259,15 +328,14 @@ test('getUserGameHistory supports both global and user-specific history queries'
   const globalResult = await getUserGameHistory(pool, undefined, 1, 10)
   assert.equal(globalResult.page, 1)
   assert.equal(globalResult.total, 0)
-  assert.ok(executedQueries[0].text.includes('WHERE status = $1'))
-  assert.deepEqual(executedQueries[0].values, ['completed', 10, 0])
+  assert.ok(executedQueries[0].text.includes("status IN ('completed', 'flagged')"))
+  assert.deepEqual(executedQueries[0].values, [10, 0])
 
   // User-specific history
   executedQueries.length = 0
   const userResult = await getUserGameHistory(pool, validSessionId, 2, 5)
   assert.equal(userResult.page, 2)
   assert.equal(userResult.total, 0)
-  assert.ok(executedQueries[0].text.includes('WHERE user_id = $1 AND status = $2'))
-  assert.deepEqual(executedQueries[0].values, [validSessionId, 'completed', 5, 5])
+  assert.ok(executedQueries[0].text.includes("WHERE user_id = $1 AND status IN ('completed', 'flagged')"))
+  assert.deepEqual(executedQueries[0].values, [validSessionId, 5, 5])
 })
-

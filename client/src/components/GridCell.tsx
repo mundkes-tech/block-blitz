@@ -3,6 +3,8 @@ import type { BlockPattern } from '../game/shapes'
 import { BlockPatternSvg } from './BlockPatternSvg'
 
 type GridCellProps = {
+  row?: number
+  col?: number
   occupied: boolean
   color?: string | null
   pattern?: BlockPattern | null
@@ -17,6 +19,8 @@ type GridCellProps = {
 
 function GridCell({
   occupied,
+  row,
+  col,
   color,
   pattern,
   preview,
@@ -50,13 +54,16 @@ function GridCell({
     style.backgroundColor = 'rgba(239, 68, 68, 0.22)'
   }
 
+  const position = row !== undefined && col !== undefined
+    ? `Board cell row ${row + 1}, column ${col + 1}`
+    : 'Board cell'
   const ariaDescription = occupied
-    ? `Occupied cell, ${pattern || 'solid'}`
+    ? `${position}, occupied cell, ${pattern || 'solid'}`
     : preview === 'valid'
-      ? 'Valid placement cell'
+      ? `${position}, valid`
       : preview === 'invalid'
-        ? 'Invalid placement cell'
-        : 'Empty cell'
+        ? `${position}, invalid`
+        : `${position}, empty`
 
   return (
     <div

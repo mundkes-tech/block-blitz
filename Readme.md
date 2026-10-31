@@ -1,176 +1,175 @@
-# 🧩 BLOCK BLITZ
+# Block Blitz
 
-> **PUZZLE • PLACE • CLEAR • COMBO**  
-> A full-stack browser-based block puzzle web game inspired by *Block Blast!*, engineered with React 19, TypeScript, Express 5, and PostgreSQL.
+Block Blitz is a responsive 8x8 block-placement puzzle game. Place the three
+generated pieces, clear complete rows or columns, build combos, and continue
+until none of the remaining pieces fit. Gameplay, scoring, boosters, and the
+visual layout are implemented in the React client; authenticated scores are
+stored in PostgreSQL through the Express API.
 
----
+## Features
 
-## 📖 Project Overview
+- Pointer-based mouse, touch, and pen placement with valid/invalid previews.
+- 8x8 board, row/column clears, combos, reroll, hammer, and undo boosters.
+- Anonymous local play and authenticated history, dashboard statistics, and
+  global leaderboards.
+- MP3 background music plus Web Audio sound effects.
+- Server-side plausibility validation and flagged-score review state.
+- Persistent client retry queue for finished authenticated matches.
 
-**BLOCK BLITZ** is an engaging puzzle game combining responsive tactile drag-and-drop gameplay, satisfying row and column blast effects, progressive combo mechanics, global and filtered leaderboards, user profiles, and server-side score verification.
+## Gameplay
 
----
+Drag a tray piece onto the board. A piece is accepted only when every occupied
+cell is inside the board and empty. A completed row or column is cleared
+immediately. A match ends when no available piece can be placed.
 
-## 🎮 Gameplay & Rules
+## Scoring
 
-1. **Board**: An 8×8 grid where blocks are placed.
-2. **Block Generation**: 3 dynamic shapes appear in the tray per cycle. A fairness algorithm ensures deals are never impossible when valid moves exist on the board.
-3. **Placing Pieces**: Drag shapes onto the board. Hovering shows a glowing ghost footprint (valid) or soft red warning (invalid). On mobile touch screens, blocks feature an elevated offset so the finger never blocks the view.
-4. **Clearing Lines**: Filling any complete row or column clears it instantly. Multiple simultaneous rows/columns trigger **Double**, **Triple**, or **Quadruple Clears** with glowing flash effects and dynamic screen shake!
-5. **Combos**: Clearing lines on consecutive turns builds up a combo multiplier (`Combo x2`, `Combo x3`, etc.), triggering pitch-shifting harmonic chimes and large bonus points.
-6. **Tactical Boosters (Section 47 Bonus Points)**:
-   * 🔄 **Reroll Tray**: Redraw 3 fresh pieces when facing an unplayable tray.
-   * 🔨 **Hammer Smash**: Click hammer mode, then click any filled cell on the board to smash it with particle effects.
-   * ↩️ **Undo Move**: Reverts the last placed block if you make an accidental move.
-7. **HTML5 Canvas Particle Burst**: Simultaneous row/column clears blast glowing particle shards matching block colors with real physics.
-8. **Responsive Widescreen Layout**: Adapts to full desktop width with a 3-column studio arena (Player profile, live telemetry, and mini-leaderboard) while collapsing cleanly to a thumb-friendly mobile layout on smaller screens.
-9. **Game Over**: The match concludes when none of the available pieces can legally fit onto the board.
+The client uses the existing scoring implementation in
+[`client/src/game/scoring.ts`](client/src/game/scoring.ts). The formula is:
 
----
+`placement score = base piece-cell points + line-clear points + combo bonus`
 
-## 🧮 Scoring System & Formula
+The exact constants are defined in that source file and are not duplicated in
+the API. The server applies plausibility ceilings; it does not recalculate the
+game from a seeded piece stream.
 
-Documented as required by **Section 17 & 43**:
+## Architecture
 
-$$\text{Total Score} = \text{Base Block Points} + \text{Line Clear Points} + \text{Multi-Clear Bonus} + \text{Combo Bonus}$$
-
-| Action | Formula / Points | Example |
-| :--- | :--- | :--- |
-| **Placing a Block** | `10 pts per cell` | 4-cell block = `+40 pts` |
-| **Single Line Clear** | `100 pts` | 1 line = `+100 pts` |
-| **Double Clear** | `200 pts + 20 multi bonus = 240 pts` | 2 lines = `+240 pts` |
-| **Triple Clear** | `300 pts + 40 multi bonus = 340 pts` | 3 lines = `+340 pts` |
-| **Combo Bonus** | `Combo Level × 50 pts` | Combo x3 = `+150 bonus pts` |
-
----
-
-## 🛡️ Server-Side Score Validation (Anti-Cheat Engine)
-
-As specified in **Section 33**, client-submitted game data is never blindly trusted:
-1. **Session Lifecycle Verification**: Sessions must be created via `/api/games/start` before play; duplicate submissions or completing an already completed session return `409 Conflict`.
-2. **Speed & Duration Plausibility**: Compares `blocksPlaced` against `duration`. Minimum required placement time threshold prevents automated instant bot injections (`duration >= blocksPlaced * 0.1s`).
-3. **Line-to-Block Mathematical Limit**: Cleared lines cannot physically exceed theoretical bounds relative to blocks placed (`linesCleared <= blocksPlaced * 4`).
-4. **Score Ceiling Bounds**: Max score is checked against theoretical maximums per block and combo multiplier (`score <= blocksPlaced * 1500 + linesCleared * 500 + 5000`).
-
----
-
-## 🎨 Visual Themes & Audio System
-
-* **5 Curated Themes**:
-  * 🟢 **Classic Emerald**: Deep midnight obsidian with lush jade accents.
-  * ⚡ **Cyber Neon**: Dark purple with radiant neon pink and electric cyan.
-  * 🍬 **Sweet Candy**: Bubblegum pink, sunny pastel yellow, and mint.
-  * 🌊 **Ocean Deep**: Abyssal navy, glowing cyan, and seafoam.
-  * 🌌 **Galaxy Starlight**: Cosmic purple, nebula magenta, and stardust.
-* **Audio System**:
-  * **Independent Controls**: Separate **Music ON/OFF** and **Sound FX ON/OFF** toggles.
-  * **Procedural Ambient BGM**: Relaxing pentatonic synth arpeggios generated in real-time via Web Audio API (no external asset lag).
-  * **Dynamic Sound Effects**: Button clicks, block pick-up pops, placement thuds, line clear chimes, multi-line chords, escalating combo tones, game over sound, and high-score fanfare.
-
----
-
-## 📊 Database Schema (PostgreSQL)
-
-### `users`
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  highest_score INTEGER NOT NULL DEFAULT 0,
-  total_games INTEGER NOT NULL DEFAULT 0,
-  total_lines_cleared INTEGER NOT NULL DEFAULT 0,
-  highest_combo INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+```text
+React/Vite client
+       |
+       | HTTPS JSON + Bearer JWT
+       v
+Express API (server/src)
+       |
+       | parameterized SQL / PostgreSQL transactions
+       v
+PostgreSQL
 ```
 
-### `game_sessions`
-```sql
-CREATE TABLE game_sessions (
-  session_id UUID PRIMARY KEY,
-  user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
-  score INTEGER NOT NULL DEFAULT 0,
-  lines_cleared INTEGER NOT NULL DEFAULT 0,
-  blocks_placed INTEGER NOT NULL DEFAULT 0,
-  rows_cleared INTEGER NOT NULL DEFAULT 0,
-  columns_cleared INTEGER NOT NULL DEFAULT 0,
-  highest_combo INTEGER NOT NULL DEFAULT 0,
-  duration INTEGER NOT NULL DEFAULT 0,
-  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMPTZ NULL,
-  status TEXT NOT NULL DEFAULT 'in_progress'
-);
+## Tech stack
+
+React, TypeScript, Vite, Express 5, PostgreSQL, `pg`, Node.js, and Web Audio.
+
+## Install and run
+
+Prerequisites: Node.js 20+ and PostgreSQL 14+.
+
+```bash
+npm install
+copy server\.env.example server\.env
+copy client\.env.example client\.env
+npm run build
+npm test
+npm run dev:server
+npm run dev:client
 ```
 
----
+The API initializes the schema at startup. To run it explicitly:
 
-## 🔌 API Documentation
+```bash
+npm run migrate
+```
 
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/games/start` | Creates a new game session. Optional `userId` body parameter. |
-| `POST` | `/api/games/complete` | Submits match result (`sessionId`, `score`, `linesCleared`, `blocksPlaced`, `highestCombo`, `duration`). Validates results and updates player statistics. |
-| `GET` | `/api/games/history` | Returns paginated match history (`page`, `pageSize`, optional `userId`). |
-| `GET` | `/api/games/stats` | Returns aggregate statistics (total games, highest score, average score, lines cleared). |
-| `GET` | `/api/leaderboard` | Global ranked players. Supports `?timeframe=all\|daily\|weekly\|monthly` and pagination. |
-| `GET` | `/api/leaderboard/me` | Fetches the rank and highest score for a given `?userId=...`. |
-| `GET` | `/api/auth/me` | Returns current user profile and career stats. |
-| `GET` | `/api/auth/users` | Lists benchmark demo users for quick testing and profile switching. |
+## Environment variables
 
----
+### Server (`server/.env`)
 
-## 🚀 Getting Started Locally
+| Variable | Description |
+|---|---|
+| `PORT` | HTTP port; hosting providers may inject this. |
+| `NODE_ENV` | `development` or `production`; production requires `JWT_SECRET`. |
+| `DATABASE_URL` | PostgreSQL connection URL. |
+| `JWT_SECRET` | Long random signing secret; never commit it. |
+| `CLIENT_ORIGINS` | Comma-separated browser origins allowed by CORS. |
 
-### Prerequisites
-* Node.js v18+ (tested on Node v20)
-* PostgreSQL 14+
+### Client (`client/.env`)
 
-### Setup Instructions
+| Variable | Description |
+|---|---|
+| `VITE_API_URL` | Base URL of the API, without a trailing slash. |
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/username/block-blitz.git
-   cd block-blitz
-   ```
+Committed templates are [`server/.env.example`](server/.env.example) and
+[`client/.env.example`](client/.env.example).
 
-2. **Configure Environment Variables**:
-   * Create `server/.env`:
-     ```env
-     PORT=5000
-     CLIENT_URL=http://localhost:5173
-     DATABASE_URL=postgresql://postgres:password@localhost:5432/block_blitz
-     ```
-   * Create `client/.env`:
-     ```env
-     VITE_API_BASE_URL=http://localhost:5000
-     ```
+## API
 
-3. **Install Dependencies**:
-   ```bash
-   npm install
-   npm --prefix client install
-   ```
+All protected endpoints require `Authorization: Bearer <JWT>`.
 
-4. **Run Database Migrations & Start Servers**:
-   ```bash
-   # Start backend API (runs migrations and seeds benchmark accounts automatically)
-   npm run dev:server
+| Method | Path | Auth | Body/query | Success and errors |
+|---|---|---|---|---|
+| GET | `/health` | No | None | `200` health response |
+| GET | `/api/health` | No | None | `200` health response |
+| GET | `/api/health/db` | No | None | `200` ready or `503` unavailable |
+| POST | `/api/auth/register` | No | `name`, `email`, `password` | `201`; `400`, `409` |
+| POST | `/api/auth/login` | No | `email`, `password` | `200`; `400`, `401` |
+| GET | `/api/auth/me` | Yes | None | `200`; `401`, `404` |
+| POST | `/api/games/start` | Yes | Empty JSON; `X-Request-Id` recommended | `201`; `401`, `500` |
+| POST | `/api/games/complete` | Yes | `sessionId`, `score`, `linesCleared`, `blocksPlaced`, `highestCombo`, `duration`, `moveLog` | `200`; `400`, `401`, `403`, `404`, `500` |
+| POST | `/api/games/:sessionId/complete` | Yes | Completion fields | Same as completion endpoint |
+| GET | `/api/games/history` | Yes | `page`, `pageSize` | `200`; `400`, `401` |
+| GET | `/api/games/stats` | Yes | None | `200`; `401` |
+| GET | `/api/leaderboard` | No | `timeframe=all\|daily\|weekly\|monthly`, `page`, `pageSize` | `200`; `400`, `503` |
+| GET | `/api/leaderboard/me` | Yes | None; identity comes from JWT | `200`; `401` |
+| GET | `/api/game-sessions` | Yes | `page`, `pageSize` | `200`; `400`, `401` |
 
-   # Start frontend client (in another terminal)
-   npm run dev:client
-   ```
+Completion `moveLog` entries have `{ shapeId, row, col }`. Malformed or
+implausible submissions are saved as `flagged` for the player's history but
+never affect aggregates or leaderboards. A PostgreSQL row lock makes duplicate
+completion requests return the stored result without double-counting.
 
-5. **Run Tests**:
-   ```bash
-   npm test
-   ```
+## Database schema
 
----
+`users` contains `id UUID`, `name TEXT`, `email TEXT UNIQUE`,
+`highest_score INTEGER`, `total_games INTEGER`, `total_lines_cleared INTEGER`,
+`highest_combo INTEGER`, timestamps, and password fields.
 
-## 🌐 Live Deployment Guide
+`game_sessions` contains `session_id UUID PRIMARY KEY`, `request_id TEXT`,
+`user_id UUID`, score fields, `move_log JSONB`, timestamps, and
+`status TEXT` (`in_progress`, `completed`, or `flagged`). Indexes cover user,
+status, completion time, score, and `(user_id, request_id)` uniqueness.
 
-* **Frontend**: Deploy `client/` to **Vercel** or **Netlify**. Set build command to `npm run build` and output directory to `dist`. Configure `VITE_API_BASE_URL` in environment variables.
-* **Backend**: Deploy `server/` to **Render**, **Railway**, or **Fly.io**. Set environment variables `PORT=5000`, `CLIENT_URL=https://your-app.vercel.app`, and `DATABASE_URL=postgres://...`.
-* **Database**: Managed PostgreSQL on **Neon.tech** or **Supabase**.
+The `valid_games` SQL view is the shared filter:
+
+```sql
+WHERE status = 'completed' AND completed_at IS NOT NULL
+```
+
+Leaderboards, ranks, dashboard aggregates, and user profiles use this view.
+Flagged sessions are intentionally queried separately only for the owner's
+history, where they are marked **Under review**.
+
+## Retry queue
+
+When an authenticated result cannot be saved because of a missing session,
+network failure, or server error, the client stores a versioned entry in
+`localStorage` under `block-blitz-score-retry-v1`. It retries on app load, the
+`online` event, and every 30 seconds with exponential backoff. The same request
+ID is reused. Successful entries and non-retryable 4xx entries are removed.
+Anonymous matches never call the API.
+
+## Screenshots
+
+Add deployment screenshots under [`docs/screenshots/`](docs/screenshots/):
+
+- `home.png`
+- `gameplay.png`
+- `game-over.png`
+- `leaderboard.png`
+
+## Deployment
+
+Deployment placeholders:
+
+- Live client: `https://your-client.example.com`
+- Backend API: `https://your-api.example.com`
+- GitHub: `https://github.com/your-account/block-blitz`
+
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the provider-neutral checklist.
+
+## Known limitations
+
+Client-reported scores cannot be fully trusted. The validator checks ownership,
+session lifecycle, move-log shape, coordinate ranges, duration, line limits,
+combo limits, and a score ceiling. It does not prove that the client actually
+performed every move; deterministic server-side replay is not implemented.

@@ -81,25 +81,25 @@ export function GameOverModal({
           {saveStatus === 'saving' && (
             <span className="save-indicator save-indicator--saving">
               <span className="save-spinner" aria-hidden="true" />
-              <span>Saving match result…</span>
+              <span>Updating your records…</span>
             </span>
           )}
           {saveStatus === 'saved' && (
             <span className="save-indicator save-indicator--saved">
               <span aria-hidden="true">✓</span>
-              <span>Result synced to server</span>
+              <span>Records updated</span>
             </span>
           )}
           {saveStatus === 'unavailable' && (
             <span className="save-indicator save-indicator--local">
               <span aria-hidden="true">💾</span>
-              <span>Saved locally (Server offline)</span>
+              <span>Your result is safe</span>
             </span>
           )}
           {saveStatus === 'error' && (
             <span className="save-indicator save-indicator--error">
               <span aria-hidden="true">⚠️</span>
-              <span>Failed to save result</span>
+              <span>We could not update your records</span>
               {onRetrySave && (
                 <button
                   type="button"
@@ -146,10 +146,10 @@ export function GameOverModal({
                 onOpenAuth()
               }
             }}
-            title="Save your high score to global leaderboards by creating an account"
+            title="Join the global leaderboard by creating an account"
           >
             <span>
-              ⭐ <strong>Compete globally!</strong> Sign in or register to record your score on the leaderboard →
+              ⭐ <strong>Compete globally!</strong> Sign in or register to join the leaderboard →
             </span>
           </div>
         )}
@@ -164,6 +164,13 @@ export function GameOverModal({
           >
             ▶ Play Again
           </button>
+          <button
+            className="secondary-button btn-large w-full"
+            type="button"
+            onClick={onHome}
+          >
+            ← Back to Home
+          </button>
 
           <div className="secondary-button-row">
             <button className="secondary-button" type="button" onClick={onOpenLeaderboard}>
@@ -171,9 +178,6 @@ export function GameOverModal({
             </button>
             <button className="secondary-button" type="button" onClick={onOpenDashboard}>
               📊 Career Stats
-            </button>
-            <button className="secondary-button secondary-button--home" type="button" onClick={onHome}>
-              ← Home
             </button>
           </div>
         </div>

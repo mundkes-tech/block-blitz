@@ -3,7 +3,8 @@ import test from 'node:test'
 import { BOARD_SIZE, createEmptyBoard, type Board } from './board.js'
 import { isGameOver } from './gameOver.js'
 import { clearCompletedLines, findCompletedLines } from './lines.js'
-import { canPlaceShape, placeShape } from './placement.js'
+import { canPlace, canPlaceShape, placeShape } from './placement.js'
+import { mapPointerToAnchor } from './dragGeometry.js'
 import {
   calculatePlacementScore,
   updateCombo,
@@ -58,6 +59,39 @@ test('accepts valid placements and rejects occupied or out-of-bounds cells', () 
   assert.equal(placed[0][1], true)
   assert.equal(canPlaceShape(placed, shape, 0, 0), false)
   assert.equal(canPlaceShape(board, shape, 0, BOARD_SIZE - 1), false)
+})
+
+test('canPlace validates offset shapes without DOM access', () => {
+  const board = createEmptyBoard()
+  const shape = [[0, 0], [0, 1], [1, 0]] as const
+
+  assert.equal(canPlace(board, shape, 2, 3), true)
+  board[2][4] = true
+  assert.equal(canPlace(board, shape, 2, 3), false)
+  assert.equal(canPlace(board, shape, 7, 7), false)
+})
+
+test('maps the dragged top-left to the nearest grid anchor using grab ratios', () => {
+  const anchor = mapPointerToAnchor(
+    155,
+    133,
+    { left: 100, top: 80 },
+    {
+      paddingLeft: 8,
+      paddingTop: 8,
+      borderLeft: 1,
+      borderTop: 1,
+      borderRight: 1,
+      borderBottom: 1,
+      cellSize: 20,
+      gap: 4,
+    },
+    44,
+    20,
+    { offsetXRatio: 0.5, offsetYRatio: 0.5 },
+  )
+
+  assert.deepEqual(anchor, { row: 1, col: 1 })
 })
 
 test('finds and clears simultaneous rows and columns exactly once', () => {

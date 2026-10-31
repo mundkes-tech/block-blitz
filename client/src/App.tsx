@@ -5,7 +5,7 @@ import GameBoard, {
   type BoardPreview,
 } from './components/GameBoard'
 import PieceTray from './components/PieceTray'
-import { Navbar, type ThemeMode } from './components/Navbar'
+import { AppHeader, type ThemeMode } from './components/AppHeader'
 import { FloatingScores, type ScorePopup } from './components/FloatingScores'
 import { ParticleCanvas, type ParticleTrigger } from './components/ParticleCanvas'
 import { ConfettiCanvas } from './components/ConfettiCanvas'
@@ -25,6 +25,14 @@ import { generatePieces, getShapeDimensions, type BlockPattern, type Piece } fro
 import { BlockPatternSvg } from './components/BlockPatternSvg'
 import { isGameOver } from './game/gameOver'
 import {
+  findForgivingAnchor,
+  getPieceSize,
+  mapPointerToAnchor,
+  type DragOffset,
+  type GridAnchor,
+  type GridGeometry,
+} from './game/dragGeometry'
+import {
   calculatePlacementScore,
   updateCombo,
 } from './game/scoring'
@@ -39,6 +47,14 @@ import {
   createGameSession,
   type UserProfile,
 } from './services/gameSessionsApi'
+import type { MoveLogEntry } from './services/gameSessionsApi'
+import {
+  enqueueScoreRetry,
+  getDueScoreRetries,
+  removeScoreRetry,
+  scheduleScoreRetry,
+  updateScoreRetry,
+} from './services/scoreRetryQueue'
 import { fetchMe, logout, getStoredUser } from './services/authApi'
 import './styles/design-tokens.css'
 import './App.css'
@@ -47,7 +63,8 @@ import './styles/redesign.css'
 type ActiveDrag = {
   piece: Piece
   pointerId: number
-  isTouch?: boolean
+  offset: DragOffset
+  sourceElement: HTMLDivElement
 }
 
 type GamePhase = 'home' | 'playing' | 'gameOver'
@@ -124,9 +141,17 @@ function App() {
   const [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null)
   const [shakeBoard, setShakeBoard] = useState(false)
   const [preview, setPreview] = useState<BoardPreview | null>(null)
+  const [keyboardPieceId, setKeyboardPieceId] = useState<string | null>(null)
+  const [keyboardAnchor, setKeyboardAnchor] = useState<GridAnchor>({ row: 0, col: 0 })
   const [activeDragPieceId, setActiveDragPieceId] = useState<string | null>(null)
   const [returningPieceId, setReturningPieceId] = useState<string | null>(null)
-  const [dragCoords, setDragCoords] = useState<{ x: number; y: number; isTouch?: boolean } | null>(null)
+  const [dragCoords, setDragCoords] = useState<{
+    x: number
+    y: number
+    width: number
+    height: number
+    gap: number
+  } | null>(null)
   const [popups, setPopups] = useState<ScorePopup[]>([])
   const [particleTrigger, setParticleTrigger] = useState<ParticleTrigger | null>(null)
   const [liveAnnounce, setLiveAnnounce] = useState('')
@@ -148,6 +173,7 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => {
     return (window.localStorage.getItem(THEME_KEY) as ThemeMode) || 'classic'
   })
+  const moveLogRef = useRef<MoveLogEntry[]>([])
   const [soundEnabled, setSoundEnabled] = useState(() => readStoredBool(SOUND_ENABLED_KEY, true))
   const [musicEnabled, setMusicEnabled] = useState(() => readStoredBool(MUSIC_ENABLED_KEY, false))
 
@@ -164,10 +190,10 @@ function App() {
   const authInitialMode: 'login' | 'register' = location.pathname === '/register' ? 'register' : 'login'
 
   const activeDragRef = useRef<ActiveDrag | null>(null)
-  const previewRef = useRef<BoardPreview | null>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const soundEffectsRef = useRef<SoundEffects | null>(null)
   const sessionIdRef = useRef<string | null>(null)
+  const saveRequestIdRef = useRef(crypto.randomUUID())
   const sessionCompletionSubmittedRef = useRef(false)
   const gameTokenRef = useRef(0)
   const baseRouteRef = useRef('/')
@@ -180,6 +206,53 @@ function App() {
     duration: 0,
     ended: false,
   })
+
+  const retryQueuedScores = useCallback(async () => {
+    if (!currentUserId) return
+    for (const entry of getDueScoreRetries()) {
+      if (entry.userId !== currentUserId) continue
+      try {
+        const sessionId =
+          entry.sessionId ??
+          await createGameSession(entry.userId, entry.requestId)
+        await completeGameSession(
+          sessionId,
+          entry.score,
+          entry.linesCleared,
+          entry.blocksPlaced,
+          entry.highestCombo,
+          entry.duration,
+          entry.moveLog,
+          entry.requestId,
+        )
+        removeScoreRetry(entry.requestId)
+        setSaveStatus('saved')
+      } catch (error) {
+        const statusCode =
+          typeof error === 'object' && error !== null && 'statusCode' in error
+            ? Number((error as { statusCode?: number }).statusCode)
+            : null
+        if (statusCode && statusCode >= 400 && statusCode < 500 && statusCode !== 408 && statusCode !== 429) {
+          removeScoreRetry(entry.requestId)
+          console.warn('Dropping non-retryable score save', entry.requestId)
+        } else {
+          updateScoreRetry(scheduleScoreRetry(entry))
+        }
+      }
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    const startupRetry = window.setTimeout(() => void retryQueuedScores(), 0)
+    const onOnline = () => void retryQueuedScores()
+    window.addEventListener('online', onOnline)
+    const intervalId = window.setInterval(() => void retryQueuedScores(), 30_000)
+    return () => {
+      window.clearTimeout(startupRetry)
+      window.removeEventListener('online', onOnline)
+      window.clearInterval(intervalId)
+    }
+  }, [retryQueuedScores])
 
   // Dynamic Level & XP
   const playerLevelInfo = calculatePlayerLevel(score)
@@ -248,12 +321,12 @@ function App() {
       // Storage quota or privacy mode
     }
 
-    if (musicEnabled && phase === 'playing') {
+    if (musicEnabled) {
       soundEffectsRef.current?.startBgm()
     } else {
       soundEffectsRef.current?.stopBgm()
     }
-  }, [musicEnabled, phase])
+  }, [musicEnabled])
 
   // Auto-dismiss score popups
   useEffect(() => {
@@ -295,19 +368,6 @@ function App() {
     }
   }, [phase])
 
-  // Global button click audio
-  useEffect(() => {
-    const handleGlobalButtonClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null
-      const button = target?.closest('button, [role="button"]')
-      if (button) {
-        playSound('buttonClick')
-      }
-    }
-    window.addEventListener('click', handleGlobalButtonClick, { capture: true })
-    return () => window.removeEventListener('click', handleGlobalButtonClick, { capture: true })
-  }, [playSound])
-
   const addMatchLog = useCallback((text: string, subtext?: string, color?: string) => {
     setMatchLogs((prev) => [
       { id: Date.now() + Math.random(), text, subtext, color },
@@ -335,7 +395,6 @@ function App() {
 
     if (
       token !== gameTokenRef.current ||
-      !sessionId ||
       !stats.ended ||
       (sessionCompletionSubmittedRef.current && !forceRetry)
     ) {
@@ -345,6 +404,27 @@ function App() {
     sessionCompletionSubmittedRef.current = true
     setSaveStatus('saving')
 
+    const retryEntry = {
+      requestId: saveRequestIdRef.current,
+      sessionId,
+      userId: currentUserId ?? '',
+      score: stats.score,
+      linesCleared: stats.linesCleared,
+      blocksPlaced: stats.blocksPlaced,
+      highestCombo: stats.highestCombo,
+      duration: stats.duration,
+      moveLog: [...moveLogRef.current],
+      timestamp: Date.now(),
+    }
+
+    if (!sessionId) {
+      if (currentUserId) {
+        enqueueScoreRetry(retryEntry)
+        setSaveStatus('unavailable')
+      }
+      return
+    }
+
     completeGameSession(
       sessionId,
       stats.score,
@@ -352,6 +432,8 @@ function App() {
       stats.blocksPlaced,
       stats.highestCombo,
       stats.duration,
+      moveLogRef.current,
+      saveRequestIdRef.current,
     )
       .then((completedData) => {
         if (completedData) {
@@ -361,14 +443,10 @@ function App() {
           setSaveStatus('saved')
         }
       })
-      .catch((err) => {
-        const isOffline =
-          err instanceof Error &&
-          (err.message.includes('unavailable') ||
-            err.message.includes('Failed to fetch') ||
-            err.message.includes('NetworkError'))
-        setSaveStatus(isOffline ? 'unavailable' : 'error')
-        setLiveAnnounce('Could not save score to server. Saved locally.')
+      .catch(() => {
+        enqueueScoreRetry(retryEntry)
+        setSaveStatus('unavailable')
+        setLiveAnnounce('Your result is safe, but your records could not be updated.')
       })
   }
 
@@ -377,7 +455,13 @@ function App() {
   }
 
   const createSessionForGame = useCallback((token: number) => {
-    createGameSession(currentUserId ?? undefined)
+    if (!currentUserId) {
+      sessionIdRef.current = null
+      saveRequestIdRef.current = crypto.randomUUID()
+      setSaveStatus('idle')
+      return
+    }
+    createGameSession(currentUserId ?? undefined, saveRequestIdRef.current)
       .then((createdSessionId) => {
         if (token !== gameTokenRef.current) return
         sessionIdRef.current = createdSessionId
@@ -471,49 +555,81 @@ function App() {
     setLiveAnnounce(`Hammer smashed block at row ${row + 1}, column ${col + 1}.`)
   }
 
-  const updatePreview = (piece: Piece, clientX: number, clientY: number) => {
+  const measureGrid = (): GridGeometry | null => {
     const boardEl = boardRef.current
-    if (!boardEl) return
+    if (!boardEl) return null
 
     const bounds = boardEl.getBoundingClientRect()
     const styles = window.getComputedStyle(boardEl)
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0
     const paddingRight = Number.parseFloat(styles.paddingRight) || 0
     const paddingTop = Number.parseFloat(styles.paddingTop) || 0
-    const paddingBottom = Number.parseFloat(styles.paddingBottom) || 0
+    const borderLeft = Number.parseFloat(styles.borderLeftWidth) || 0
+    const borderTop = Number.parseFloat(styles.borderTopWidth) || 0
+    const borderRight = Number.parseFloat(styles.borderRightWidth) || 0
+    const borderBottom = Number.parseFloat(styles.borderBottomWidth) || 0
     const gap = Number.parseFloat(styles.columnGap || styles.gap || '0')
-    const contentWidth = bounds.width - paddingLeft - paddingRight
-    const contentHeight = bounds.height - paddingTop - paddingBottom
-    const cellWidth = (contentWidth - gap * (BOARD_SIZE - 1)) / BOARD_SIZE
-    const cellHeight = (contentHeight - gap * (BOARD_SIZE - 1)) / BOARD_SIZE
-    const x = clientX - bounds.left - paddingLeft
-    const y = clientY - bounds.top - paddingTop
-    const column = Math.floor(x / (cellWidth + gap))
-    const row = Math.floor(y / (cellHeight + gap))
-    const insideBoard =
-      x >= 0 &&
-      y >= 0 &&
-      x < contentWidth &&
-      y < contentHeight &&
-      column >= 0 &&
-      column < BOARD_SIZE &&
-      row >= 0 &&
-      row < BOARD_SIZE
+    const contentWidth =
+      bounds.width - paddingLeft - paddingRight - borderLeft - borderRight
+    const cellSize = (contentWidth - gap * (BOARD_SIZE - 1)) / BOARD_SIZE
+    return {
+      paddingLeft,
+      paddingTop,
+      borderLeft,
+      borderTop,
+      borderRight,
+      borderBottom,
+      cellSize,
+      gap,
+    }
+  }
 
-    if (!insideBoard) {
-      previewRef.current = null
+  const getDragAnchor = (
+    activeDrag: ActiveDrag,
+    clientX: number,
+    clientY: number,
+  ): GridAnchor | null => {
+    const geometry = measureGrid()
+    const boardEl = boardRef.current
+    if (!geometry || !boardEl) return null
+    const size = getPieceSize(activeDrag.piece.shape, geometry)
+
+    const rect = boardEl.getBoundingClientRect()
+    const anchor = mapPointerToAnchor(
+      clientX,
+      clientY,
+      rect,
+      geometry,
+      size.width,
+      size.height,
+      activeDrag.offset,
+    )
+    return findForgivingAnchor(
+      board,
+      activeDrag.piece.shape,
+      anchor,
+      clientX,
+      clientY,
+      rect,
+      geometry,
+      size.width,
+      size.height,
+      activeDrag.offset,
+    ) ?? anchor
+  }
+
+  const updatePreview = (activeDrag: ActiveDrag, clientX: number, clientY: number) => {
+    const anchor = getDragAnchor(activeDrag, clientX, clientY)
+    if (!anchor) {
       setPreview(null)
       return
     }
-
-    const nextPreview: BoardPreview = {
-      row,
-      col: column,
-      shape: piece.shape,
-      valid: canPlaceShape(board, piece.shape, row, column),
-    }
-    previewRef.current = nextPreview
-    setPreview(nextPreview)
+    setPreview({
+      row: anchor.row,
+      col: anchor.col,
+      shape: activeDrag.piece.shape,
+      valid: canPlaceShape(board, activeDrag.piece.shape, anchor.row, anchor.col),
+    })
   }
 
   const handlePointerDown = (
@@ -523,29 +639,53 @@ function App() {
     if (phase !== 'playing') return
 
     event.preventDefault()
-    const isTouch = event.pointerType === 'touch'
-    activeDragRef.current = { piece, pointerId: event.pointerId, isTouch }
+    const geometry = measureGrid()
+    const boardEl = boardRef.current
+    if (!geometry || !boardEl) return
+    const sourceRect = event.currentTarget.getBoundingClientRect()
+    const size = getPieceSize(piece.shape, geometry)
+    const offset = {
+      offsetXRatio: Math.max(0, Math.min(1, (event.clientX - sourceRect.left) / sourceRect.width)),
+      offsetYRatio: Math.max(0, Math.min(1, (event.clientY - sourceRect.top) / sourceRect.height)),
+    }
+    activeDragRef.current = {
+      piece,
+      pointerId: event.pointerId,
+      offset,
+      sourceElement: event.currentTarget,
+    }
     setActiveDragPieceId(piece.id)
-    setDragCoords({ x: event.clientX, y: event.clientY, isTouch })
+    setDragCoords({
+      x: event.clientX - offset.offsetXRatio * size.width,
+      y: event.clientY - offset.offsetYRatio * size.height,
+      width: size.width,
+      height: size.height,
+      gap: geometry.gap,
+    })
     playSound('blockPick')
-
-    // On mobile touch, lift preview upward so thumb doesn't obscure the placement
-    const dragY = isTouch ? event.clientY - 65 : event.clientY
-    updatePreview(piece, event.clientX, dragY)
+    updatePreview(activeDragRef.current, event.clientX, event.clientY)
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const activeDrag = activeDragRef.current
     if (activeDrag?.pointerId === event.pointerId) {
-      setDragCoords({ x: event.clientX, y: event.clientY, isTouch: activeDrag.isTouch })
-      const dragY = activeDrag.isTouch ? event.clientY - 65 : event.clientY
-      updatePreview(activeDrag.piece, event.clientX, dragY)
+      event.preventDefault()
+      const geometry = measureGrid()
+      if (!geometry) return
+      const size = getPieceSize(activeDrag.piece.shape, geometry)
+      setDragCoords({
+        x: event.clientX - activeDrag.offset.offsetXRatio * size.width,
+        y: event.clientY - activeDrag.offset.offsetYRatio * size.height,
+        width: size.width,
+        height: size.height,
+        gap: geometry.gap,
+      })
+      updatePreview(activeDrag, event.clientX, event.clientY)
     }
   }
 
   const clearDrag = useCallback(() => {
     activeDragRef.current = null
-    previewRef.current = null
     setActiveDragPieceId(null)
     setDragCoords(null)
     setPreview(null)
@@ -553,19 +693,54 @@ function App() {
 
   const handlePointerCancel = (event: PointerEvent<HTMLDivElement>) => {
     const activeDrag = activeDragRef.current
-    if (activeDrag && activeDrag.pointerId === event.pointerId) {
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    setReturningPieceId(activeDrag.piece.id)
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    } catch {
+      // Pointer capture may already have been released by the browser.
+    }
+    clearDrag()
+  }
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const activeDrag = activeDragRef.current
+      if (!activeDrag) return
+      event.preventDefault()
       setReturningPieceId(activeDrag.piece.id)
+      if (activeDrag.sourceElement.hasPointerCapture(activeDrag.pointerId)) {
+        activeDrag.sourceElement.releasePointerCapture(activeDrag.pointerId)
+      }
       clearDrag()
     }
-  }
+
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [clearDrag])
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const activeDrag = activeDragRef.current
-    const currentPreview = previewRef.current
 
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return
+    event.preventDefault()
+    const finalAnchor = getDragAnchor(activeDrag, event.clientX, event.clientY)
+    const validDrop =
+      finalAnchor !== null &&
+      canPlaceShape(board, activeDrag.piece.shape, finalAnchor.row, finalAnchor.col) &&
+      pieces.some(({ id }) => id === activeDrag.piece.id)
 
-    if (currentPreview?.valid && pieces.some(({ id }) => id === activeDrag.piece.id)) {
+    if (validDrop && finalAnchor) {
+    moveLogRef.current = [
+      ...moveLogRef.current,
+      {
+        shapeId: activeDrag.piece.shape.id,
+        row: finalAnchor.row,
+        col: finalAnchor.col,
+      },
+    ]
       // Save snapshot for undo booster
       setUndoHistory((prev) => [
         ...prev.slice(-3),
@@ -585,16 +760,16 @@ function App() {
       const placedBoard = placeShape(
         board,
         activeDrag.piece.shape,
-        currentPreview.row,
-        currentPreview.col,
+        finalAnchor.row,
+        finalAnchor.col,
       )
 
       // Record block colors and patterns onto the board
       const nextBoardColors = boardColors.map((r) => [...r])
       const nextBoardPatterns = boardPatterns.map((r) => [...r])
       activeDrag.piece.shape.cells.forEach((cell) => {
-        const r = currentPreview.row + cell.row
-        const c = currentPreview.col + cell.col
+        const r = finalAnchor.row + cell.row
+        const c = finalAnchor.col + cell.col
         nextBoardColors[r][c] = activeDrag.piece.shape.color
         nextBoardPatterns[r][c] = activeDrag.piece.shape.pattern || null
       })
@@ -726,6 +901,7 @@ function App() {
         duration: durationSeconds,
         ended: false,
       }
+      moveLogRef.current = []
 
       // Floating Popups
       const newPopups: ScorePopup[] = [
@@ -755,8 +931,8 @@ function App() {
       setBoardEffect({
         id: Date.now(),
         placedCells: activeDrag.piece.shape.cells.map((cell) => ({
-          row: currentPreview.row + cell.row,
-          col: currentPreview.col + cell.col,
+          row: finalAnchor.row + cell.row,
+          col: finalAnchor.col + cell.col,
         })),
         clearedRows: cleared.clearedRows,
         clearedColumns: cleared.clearedColumns,
@@ -801,13 +977,83 @@ function App() {
       setReturningPieceId(activeDrag.piece.id)
     }
 
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
     clearDrag()
+  }
+
+  const handleKeyboardSelect = (piece: Piece) => {
+    if (phase !== 'playing') return
+    setKeyboardPieceId(piece.id)
+    setKeyboardAnchor({ row: 0, col: 0 })
+    setPreview({
+      row: 0,
+      col: 0,
+      shape: piece.shape,
+      valid: canPlaceShape(board, piece.shape, 0, 0),
+    })
+    setLiveAnnounce(`${piece.shape.name} piece selected. Use arrow keys to move it.`)
+  }
+
+  const handleKeyboardMove = (piece: Piece, key: string) => {
+    if (phase !== 'playing' || keyboardPieceId !== piece.id) return
+    const row = Math.max(0, Math.min(BOARD_SIZE - 1, keyboardAnchor.row + (key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0)))
+    const col = Math.max(0, Math.min(BOARD_SIZE - 1, keyboardAnchor.col + (key === 'ArrowLeft' ? -1 : key === 'ArrowRight' ? 1 : 0)))
+    const nextAnchor = { row, col }
+    setKeyboardAnchor(nextAnchor)
+    setPreview({
+      row,
+      col,
+      shape: piece.shape,
+      valid: canPlaceShape(board, piece.shape, row, col),
+    })
+  }
+
+  const handleKeyboardPlace = (piece: Piece) => {
+    if (phase !== 'playing' || keyboardPieceId !== piece.id) return
+    const boardEl = boardRef.current
+    const source = document.querySelector(`[data-piece-id="${piece.id}"]`)
+    if (!boardEl || !(source instanceof HTMLDivElement)) return
+    const geometry = measureGrid()
+    if (!geometry) return
+    const rect = boardEl.getBoundingClientRect()
+    const styles = window.getComputedStyle(boardEl)
+    const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0
+    const paddingTop = Number.parseFloat(styles.paddingTop) || 0
+    const borderLeft = Number.parseFloat(styles.borderLeftWidth) || 0
+    const borderTop = Number.parseFloat(styles.borderTopWidth) || 0
+    const step = geometry.cellSize + geometry.gap
+    const event = {
+      currentTarget: source,
+      pointerId: -1,
+      clientX: rect.left + borderLeft + paddingLeft + keyboardAnchor.col * step,
+      clientY: rect.top + borderTop + paddingTop + keyboardAnchor.row * step,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent<HTMLDivElement>
+    activeDragRef.current = {
+      piece,
+      pointerId: -1,
+      offset: { offsetXRatio: 0, offsetYRatio: 0 },
+      sourceElement: source,
+    }
+    handlePointerUp(event)
+    setKeyboardPieceId(null)
+    setPreview(null)
+  }
+
+  const handleKeyboardCancel = () => {
+    setKeyboardPieceId(null)
+    setPreview(null)
+    setLiveAnnounce('Placement cancelled. Piece returned to the tray.')
   }
 
   const startNewGame = useCallback(() => {
     clearDrag()
     gameTokenRef.current += 1
     sessionIdRef.current = null
+    saveRequestIdRef.current = crypto.randomUUID()
+    setKeyboardPieceId(null)
     sessionCompletionSubmittedRef.current = false
     gameStatsRef.current = {
       score: 0,
@@ -906,7 +1152,7 @@ function App() {
       }
     } else if (current === '/play') {
       baseRouteRef.current = '/play'
-      if (phase === 'home' || phase === 'gameOver') {
+      if (phase === 'home') {
         queueMicrotask(() => {
           startNewGame()
         })
@@ -947,51 +1193,25 @@ function App() {
         </div>
       )}
 
-      <Navbar
-        theme={theme}
-        onThemeChange={setTheme}
-        soundEnabled={soundEnabled}
-        onToggleSound={() => {
-          setSoundEnabled((prev) => !prev)
-          playSound('buttonClick')
-        }}
-        musicEnabled={musicEnabled}
-        onToggleMusic={() => {
-          setMusicEnabled((prev) => !prev)
-          playSound('buttonClick')
-        }}
-        onOpenLeaderboard={() => {
-          navigate('/leaderboard')
-          playSound('buttonClick')
-        }}
-        onOpenDashboard={() => {
-          navigate('/dashboard')
-          playSound('buttonClick')
-        }}
-        onOpenChallenge={() => {
-          navigate('/challenges')
-          playSound('buttonClick')
-        }}
-        onOpenAchievements={() => {
-          navigate('/achievements')
-          playSound('buttonClick')
-        }}
-        onHome={returnHome}
-        onOpenAuth={() => openAuth('login')}
-        levelInfo={playerLevelInfo}
-        currentUser={currentUser}
-      />
-
-      {phase === 'home' && location.pathname !== '/play' ? (
-        <HomeScreen
-          bestScore={bestScore}
-          hasActiveGame={score > 0}
-          totalLinesCleared={totalLinesCleared}
-          unlockedBadgesCount={unlockedAchievements.length}
-          onPlay={startNewGame}
-          onNewGame={startNewGame}
-          currentUser={currentUser}
-          levelInfo={playerLevelInfo}
+        <AppHeader
+          theme={theme}
+          onThemeChange={setTheme}
+          soundEnabled={soundEnabled}
+          onToggleSound={() => {
+            setSoundEnabled((prev) => !prev)
+            playSound('buttonClick')
+          }}
+          musicEnabled={musicEnabled}
+          onToggleMusic={() => {
+            const nextEnabled = !musicEnabled
+            setMusicEnabled(nextEnabled)
+            if (nextEnabled) {
+              soundEffectsRef.current?.startBgm()
+            } else {
+              soundEffectsRef.current?.stopBgm()
+            }
+            playSound('buttonClick')
+          }}
           onOpenLeaderboard={() => {
             navigate('/leaderboard')
             playSound('buttonClick')
@@ -1008,6 +1228,51 @@ function App() {
             navigate('/achievements')
             playSound('buttonClick')
           }}
+          onHome={returnHome}
+          onOpenAuth={() => openAuth('login')}
+          levelInfo={playerLevelInfo}
+          currentUser={currentUser}
+        />
+
+      <div className="bb-page">
+      {phase === 'home' && location.pathname !== '/play' ? (
+        <HomeScreen
+          bestScore={bestScore}
+          totalLinesCleared={totalLinesCleared}
+          unlockedBadgesCount={unlockedAchievements.length}
+          onPlay={startNewGame}
+          currentUser={currentUser}
+          levelInfo={playerLevelInfo}
+          soundEnabled={soundEnabled}
+          musicEnabled={musicEnabled}
+          onToggleSound={() => {
+            setSoundEnabled((prev) => !prev)
+            playSound('buttonClick')
+          }}
+          onToggleMusic={() => {
+            const nextEnabled = !musicEnabled
+            setMusicEnabled(nextEnabled)
+            if (nextEnabled) soundEffectsRef.current?.startBgm()
+            else soundEffectsRef.current?.stopBgm()
+            playSound('buttonClick')
+          }}
+          onOpenLeaderboard={() => {
+            navigate('/leaderboard')
+            playSound('buttonClick')
+          }}
+          onOpenDashboard={() => {
+            navigate('/dashboard')
+            playSound('buttonClick')
+          }}
+          onOpenChallenge={() => {
+            navigate('/challenges')
+            playSound('buttonClick')
+          }}
+          onOpenAchievements={() => {
+            navigate('/achievements')
+            playSound('buttonClick')
+          }}
+          onOpenAuth={() => openAuth('login')}
         />
       ) : (
         <div className="widescreen-arena-wrapper">
@@ -1127,7 +1392,7 @@ function App() {
             {/* Blocks Arsenal Dock (Centered directly under the 8x8 Board) */}
             <PieceTray
               pieces={pieces}
-              activePieceId={activeDragPieceId}
+              activePieceId={activeDragPieceId ?? keyboardPieceId}
               returningPieceId={returningPieceId}
               locked={phase === 'gameOver'}
               compact={false}
@@ -1135,6 +1400,10 @@ function App() {
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerCancel}
+              onKeyboardSelect={handleKeyboardSelect}
+              onKeyboardMove={handleKeyboardMove}
+              onKeyboardPlace={handleKeyboardPlace}
+              onKeyboardCancel={handleKeyboardCancel}
             />
 
             {/* Mobile Bottom Quick Actions */}
@@ -1185,7 +1454,9 @@ function App() {
               className="floating-drag-piece"
               style={{
                 left: `${dragCoords.x}px`,
-                top: `${dragCoords.isTouch ? dragCoords.y - 65 : dragCoords.y}px`,
+                top: `${dragCoords.y}px`,
+                width: `${dragCoords.width}px`,
+                height: `${dragCoords.height}px`,
               }}
               aria-hidden="true"
             >
@@ -1194,6 +1465,8 @@ function App() {
                 style={{
                   '--piece-rows': getShapeDimensions(activeDragPiece.shape).rows,
                   '--piece-cols': getShapeDimensions(activeDragPiece.shape).cols,
+                  '--drag-cell-size': `${(dragCoords.width - dragCoords.gap * (getShapeDimensions(activeDragPiece.shape).cols - 1)) / getShapeDimensions(activeDragPiece.shape).cols}px`,
+                  '--drag-gap': `${dragCoords.gap}px`,
                 } as CSSProperties}
               >
                 {activeDragPiece.shape.cells.map(({ row, col }) => (
@@ -1215,6 +1488,7 @@ function App() {
           )}
         </div>
       )}
+      </div>
 
       {/* Game Over Modal */}
       {(phase === 'gameOver' || location.pathname === '/game-over') && (

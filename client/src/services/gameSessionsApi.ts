@@ -1,3 +1,5 @@
+import { getStoredAuthToken } from './authApi'
+
 type SessionResponse = {
   success: boolean
   data?: {
@@ -12,7 +14,7 @@ type CompletionResponse = {
   data?: {
     sessionId: string
     userId?: string | null
-    status: 'completed'
+    status: 'completed' | 'flagged'
     score: number
     linesCleared: number
     blocksPlaced?: number
@@ -26,6 +28,7 @@ type CompletionResponse = {
 export type GameSessionHistoryItem = {
   sessionId: string
   userId?: string | null
+  status?: 'completed' | 'flagged' | 'in_progress'
   score: number
   linesCleared: number
   blocksPlaced?: number
@@ -79,65 +82,67 @@ export type UserProfile = {
   createdAt: string
 }
 
+export type MoveLogEntry = {
+  shapeId: string
+  row: number
+  col: number
+}
+
 const REQUEST_TIMEOUT_MS = 5000
 const SESSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function requestId(): string {
+  return crypto.randomUUID()
+}
+
 export class GameSessionApiError extends Error {
-  constructor(message: string) {
+  readonly statusCode: number | null
+
+  constructor(message: string, statusCode: number | null = null) {
     super(message)
     this.name = 'GameSessionApiError'
+    this.statusCode = statusCode
   }
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
-  const candidateUrls: string[] = []
-  const customBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '')
-  if (customBase) {
-    candidateUrls.push(`${customBase}${path}`)
+  const customBase = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
+  if (!customBase) {
+    throw new GameSessionApiError('VITE_API_URL is not configured')
   }
-  candidateUrls.push(`http://localhost:5000${path}`)
-  candidateUrls.push(path)
 
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-  let lastResponse: Response | null = null
-
   try {
-    for (const url of candidateUrls) {
-      try {
-        const res = await fetch(url, {
-          ...init,
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            ...init.headers,
-          },
-        })
-        if (res.status === 404 && url !== candidateUrls[candidateUrls.length - 1]) {
-          continue
-        }
-        lastResponse = res
-        break
-      } catch {
-        // Try next candidate
-      }
-    }
-
-    if (!lastResponse) {
+    const url = `${customBase}${path}`
+    let response: Response
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...init.headers,
+        },
+      })
+    } catch {
       throw new GameSessionApiError('The session service is unavailable')
     }
 
     let body: unknown
     try {
-      body = await lastResponse.json()
+      body = await response.json()
     } catch {
       throw new GameSessionApiError('The session service returned invalid data')
     }
 
-    if (!lastResponse.ok) {
-      throw new GameSessionApiError('The session service is unavailable')
+    if (!response.ok) {
+      throw new GameSessionApiError(
+        'The session service is unavailable',
+        response.status,
+      )
     }
 
     return body as T
@@ -146,16 +151,15 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
   }
 }
 
-export async function createGameSession(userId?: string): Promise<string> {
+export async function createGameSession(userId?: string, idempotencyKey = requestId()): Promise<string> {
+  const token = getStoredAuthToken()
+  if (!token || !userId) {
+    throw new GameSessionApiError('Authentication required')
+  }
   const response = await request<SessionResponse>('/api/games/start', {
     method: 'POST',
-    body: JSON.stringify(userId ? { userId } : {}),
-  }).catch(() => {
-    // Fallback to legacy endpoint if /api/games/start is not ready
-    return request<SessionResponse>('/api/game-sessions', {
-      method: 'POST',
-      body: JSON.stringify(userId ? { userId } : {}),
-    })
+    headers: { Authorization: `Bearer ${token}`, 'X-Request-Id': idempotencyKey },
+    body: JSON.stringify({}),
   })
 
   if (
@@ -177,6 +181,8 @@ export async function completeGameSession(
   blocksPlaced = 0,
   highestCombo = 0,
   duration = 0,
+  moveLog: MoveLogEntry[] = [],
+  idempotencyKey = requestId(),
 ): Promise<CompletionResponse['data']> {
   if (
     !SESSION_ID_PATTERN.test(sessionId) ||
@@ -194,29 +200,21 @@ export async function completeGameSession(
     blocksPlaced,
     highestCombo,
     duration,
+    moveLog,
   }
 
-  const response = await request<CompletionResponse>(
-    `/api/games/complete`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ sessionId, ...payload }),
-    },
-  ).catch(() => {
-    // Fallback to legacy endpoint
-    return request<CompletionResponse>(
-      `/api/game-sessions/${sessionId}/result`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
-      },
-    )
+  const token = getStoredAuthToken()
+  if (!token) throw new GameSessionApiError('Authentication required')
+  const response = await request<CompletionResponse>('/api/games/complete', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'X-Request-Id': idempotencyKey },
+    body: JSON.stringify({ sessionId, ...payload }),
   })
 
   if (
     !response.success ||
     !response.data ||
-    response.data.status !== 'completed' ||
+    !['completed', 'flagged'].includes(response.data.status) ||
     response.data.sessionId !== sessionId
   ) {
     throw new GameSessionApiError('The session service returned invalid data')
@@ -323,13 +321,11 @@ export async function fetchLeaderboard(
   return data
 }
 
-export async function fetchMyRank(
-  userId: string,
-): Promise<{ rank: number; highestScore: number } | null> {
+export async function fetchMyRank(): Promise<{ rank: number; highestScore: number } | null> {
   const response = await request<{
     success: boolean
     data?: { rank: number; highestScore: number } | null
-  }>(`/api/leaderboard/me?userId=${encodeURIComponent(userId)}`, {
+  }>('/api/leaderboard/me', {
     method: 'GET',
   })
   return response.data ?? null

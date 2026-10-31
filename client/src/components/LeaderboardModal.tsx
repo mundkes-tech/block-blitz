@@ -76,7 +76,7 @@ export function LeaderboardModal({
       })
 
     if (currentUserId) {
-      fetchMyRank(currentUserId)
+      fetchMyRank()
         .then((rankData) => {
           if (activeRequestRef.current === requestId) {
             setMyRank(rankData)

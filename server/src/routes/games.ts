@@ -6,9 +6,11 @@ import {
   statsController,
   userHistoryController,
 } from '../controllers/gameSessions.js'
+import { requireAuth } from '../middleware/auth.js'
 
 export function createGamesRouter(pool: Pool | null): Router {
   const router = Router()
+  router.use(requireAuth(pool))
 
   // Section 30 & 35: Suggested Game Session API
   router.post('/start', createSessionController(pool))

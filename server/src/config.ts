@@ -18,11 +18,16 @@ function readPort(value: string | undefined): number {
 export type AppConfig = {
   port: number
   clientUrl: string
+  clientOrigins: string[]
   databaseUrl?: string
 }
 
 export function loadConfig(): AppConfig {
   const clientUrl = process.env.CLIENT_URL ?? 'http://localhost:5173'
+  const clientOrigins = (process.env.CLIENT_ORIGINS ?? clientUrl)
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
 
   try {
     new URL(clientUrl)
@@ -33,6 +38,7 @@ export function loadConfig(): AppConfig {
   return {
     port: readPort(process.env.PORT),
     clientUrl,
+    clientOrigins,
     databaseUrl: process.env.DATABASE_URL || undefined,
   }
 }

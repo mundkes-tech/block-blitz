@@ -1,11 +1,11 @@
 import { Router, type Request, type Response } from 'express'
 import type { Pool } from 'pg'
 import {
-  getAuthenticatedUser,
   loginUser,
   registerUser,
 } from '../services/auth.js'
 import { userProfileController } from '../controllers/gameSessions.js'
+import { requireAuth, type AuthenticatedRequest } from '../middleware/auth.js'
 
 export function createAuthRouter(pool: Pool | null): Router {
   const router = Router()
@@ -40,40 +40,10 @@ export function createAuthRouter(pool: Pool | null): Router {
   })
 
   // Get currently logged-in user profile
-  router.get('/me', async (req: Request, res: Response): Promise<void> => {
-    const authHeader = req.headers.authorization
-    let token: string | undefined
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7).trim()
-    } else if (req.headers['x-auth-token']) {
-      token = String(req.headers['x-auth-token']).trim()
-    } else if (req.query.token) {
-      token = String(req.query.token).trim()
-    } else if (req.query.userId) {
-      token = String(req.query.userId).trim()
-    }
-
-    if (!token) {
-      res.status(401).json({
-        success: false,
-        error: 'Authentication token required',
-      })
-      return
-    }
-
-    const user = await getAuthenticatedUser(pool, token)
-    if (!user) {
-      res.status(401).json({
-        success: false,
-        error: 'Invalid or expired authentication session',
-      })
-      return
-    }
-
+  router.get('/me', requireAuth(pool), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     res.json({
       success: true,
-      data: user,
+      data: req.user,
     })
   })
 

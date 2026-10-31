@@ -13,6 +13,7 @@ import {
   leaderboardController,
   myRankController,
 } from './controllers/gameSessions.js'
+import { requireAuth } from './middleware/auth.js'
 import { createGameSessionRouter } from './routes/gameSessions.js'
 import { createGamesRouter } from './routes/games.js'
 import { createAuthRouter } from './routes/auth.js'
@@ -23,23 +24,20 @@ export function createApp(
 ) {
   const app = express()
 
-  const allowedOrigins = new Set([
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    config.clientUrl,
-  ])
+  const allowedOrigins = new Set(config.clientOrigins)
 
   app.use(
     cors({
       origin: (origin, callback) => {
         if (!origin || allowedOrigins.has(origin)) {
           callback(null, true)
-        } else if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        } else if (
+          process.env.NODE_ENV !== 'production' &&
+          /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+        ) {
           callback(null, true)
         } else {
-          callback(null, true)
+          callback(new Error('Origin is not allowed by CORS'))
         }
       },
       credentials: true,
@@ -51,6 +49,9 @@ export function createApp(
     res.json({
       success: true,
       message: 'BLOCK BLITZ API is running',
+    })
+    app.get('/health', (_req: Request, res: Response) => {
+      res.json({ success: true, message: 'BLOCK BLITZ API is running' })
     })
   })
 
@@ -66,7 +67,7 @@ export function createApp(
   app.use('/api/game-sessions', createGameSessionRouter(databasePool))
   app.use('/api/games', createGamesRouter(databasePool))
   app.use('/api/auth', createAuthRouter(databasePool))
-  app.get('/api/leaderboard/me', myRankController(databasePool))
+  app.get('/api/leaderboard/me', requireAuth(databasePool), myRankController(databasePool))
   app.get('/api/leaderboard', leaderboardController(databasePool))
   app.get('/api/games/leaderboard', leaderboardController(databasePool))
 

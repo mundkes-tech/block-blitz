@@ -116,7 +116,7 @@ async function apiRequest<T>(
   return {
     ok: false,
     status: lastStatus || 0,
-    error: lastErrorText || 'Could not connect to the backend server. Please verify it is running on port 5000.',
+    error: lastErrorText || 'Unable to complete that request right now. Please try again.',
   }
 }
 

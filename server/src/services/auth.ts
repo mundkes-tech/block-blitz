@@ -3,7 +3,14 @@ import type { Pool } from 'pg'
 import { ApiError } from '../errors.js'
 import type { UserProfile } from './gameSessions.js'
 
-const SECRET_KEY = process.env.JWT_SECRET || 'block-blitz-production-auth-secret-key-2026'
+const configuredSecret = process.env.JWT_SECRET?.trim()
+if (!configuredSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET is required in production')
+}
+const SECRET_KEY = configuredSecret ?? crypto.randomBytes(32).toString('hex')
+if (!configuredSecret && process.env.NODE_ENV !== 'production') {
+  console.warn('JWT_SECRET is not configured; using a random development-only secret')
+}
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function requirePool(pool: Pool | null): Pool {

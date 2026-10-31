@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS game_sessions (
   session_id UUID PRIMARY KEY,
+  request_id TEXT NULL,
   user_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
   score INTEGER NOT NULL DEFAULT 0 CHECK (score >= 0),
   lines_cleared INTEGER NOT NULL DEFAULT 0 CHECK (lines_cleared >= 0),
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS game_sessions (
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ NULL,
   status TEXT NOT NULL DEFAULT 'in_progress'
-    CHECK (status IN ('in_progress', 'completed'))
+    CHECK (status IN ('in_progress', 'completed', 'flagged'))
 );
 
 ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS blocks_placed INTEGER NOT NULL DEFAULT 0;
@@ -36,6 +37,11 @@ ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS rows_cleared INTEGER NOT NULL
 ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS columns_cleared INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS highest_combo INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS duration INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS move_log JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS request_id TEXT NULL;
+ALTER TABLE game_sessions DROP CONSTRAINT IF EXISTS game_sessions_status_check;
+ALTER TABLE game_sessions ADD CONSTRAINT game_sessions_status_check
+  CHECK (status IN ('in_progress', 'completed', 'flagged'));
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_salt TEXT NULL;
@@ -44,7 +50,15 @@ CREATE INDEX IF NOT EXISTS game_sessions_user_id_idx ON game_sessions (user_id);
 CREATE INDEX IF NOT EXISTS game_sessions_status_idx ON game_sessions (status);
 CREATE INDEX IF NOT EXISTS game_sessions_completed_at_idx ON game_sessions (completed_at);
 CREATE INDEX IF NOT EXISTS game_sessions_score_idx ON game_sessions (score DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS game_sessions_user_request_idx
+  ON game_sessions (user_id, request_id)
+  WHERE request_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS users_highest_score_idx ON users (highest_score DESC);
+
+CREATE OR REPLACE VIEW valid_games AS
+SELECT *
+FROM game_sessions
+WHERE status = 'completed' AND completed_at IS NOT NULL;
 `
 
 const CLEAN_MOCK_DEMO_USERS = `

@@ -1,0 +1,29 @@
+.bb-auth-modal { width: min(420px, calc(100vw - 32px)); max-height: 90dvh; overflow-y: auto; padding: 24px; border-radius: 20px; background: #0b1b2a; color: #e7fff5; box-shadow: 0 18px 48px rgba(0,0,0,.45); }
+.bb-auth-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bb-auth-modal__eyebrow { color: #54dca2; font-size: 11px; font-weight: 800; letter-spacing: .16em; }
+.bb-auth-modal__header h2 { margin: 6px 0 0; font-size: clamp(24px, 6vw, 30px); }
+.bb-auth-modal__close { width: 40px; height: 40px; display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 999px; color: inherit; background: rgba(255,255,255,.06); cursor: pointer; }
+.bb-auth-modal__tabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: 20px 0; padding: 4px; border-radius: 12px; background: rgba(255,255,255,.04); }
+.bb-auth-modal__tab { height: 44px; border: 0; border-radius: 9px; color: #9ab8ad; background: transparent; font: inherit; white-space: nowrap; cursor: pointer; }
+.bb-auth-modal__tab.is-active { color: #d7fff0; background: rgba(25,213,139,.2); }
+.bb-auth-modal__error { margin-bottom: 16px; padding: 10px 12px; border: 1px solid rgba(248,113,113,.35); border-radius: 10px; color: #fecaca; background: rgba(127,29,29,.25); font-size: 12px; }
+.bb-auth-modal__field-error { color: #fca5a5; font-size: 12px; }
+.bb-auth-modal__form { display: grid; gap: 16px; }
+.bb-auth-modal__field { display: flex; flex-direction: column; gap: 8px; }
+.bb-auth-modal__field label { display: block; color: #e7fff5; font-size: 13px; font-weight: 600; }
+.bb-auth-modal__field input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid rgba(148,212,188,.2); border-radius: 12px; color: #f3fff9; background: rgba(255,255,255,.04); font: inherit; font-size: 16px; }
+.bb-auth-modal__field input:focus { outline: none; border-color: #19d58b; box-shadow: 0 0 0 3px rgba(25,213,139,.2); }
+.bb-auth-modal__field input::placeholder { color: rgba(231,255,245,.5); }
+.bb-auth-modal__password { position: relative; }
+.bb-auth-modal__password input { padding-right: 54px; }
+.bb-auth-modal__password button { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; color: #9ab8ad; background: transparent; cursor: pointer; }
+.bb-auth-modal__hint { color: #8ca89e; font-size: 12px; }
+.bb-auth-modal__submit { width: 100%; height: 48px; margin-top: 4px; border: 0; border-radius: 12px; color: #032116; background: #34e69d; font: inherit; font-weight: 800; cursor: pointer; }
+.bb-auth-modal__submit:disabled { opacity: .6; cursor: wait; }
+.bb-auth-modal__spinner { width: 18px; height: 18px; display: inline-block; border: 2px solid rgba(3,33,22,.35); border-top-color: #032116; border-radius: 50%; animation: bb-auth-spin .7s linear infinite; vertical-align: -4px; }
+.bb-auth-modal__footer { margin-top: 20px; text-align: center; color: #9ab8ad; font-size: 14px; }
+.bb-auth-modal__footer p { margin: 0; }
+.bb-auth-modal__switch { padding: 0; border: 0; color: #6df0b2; background: transparent; font: inherit; cursor: pointer; }
+@media (max-width: 639px) { .bb-auth-modal { padding: 20px; } }
+@keyframes bb-auth-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .bb-auth-modal__spinner { animation: none; } }

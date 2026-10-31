@@ -45,6 +45,7 @@ export class SoundEffects {
           }
         }
       })
+      this.bgmAudio.load()
 
       // Sound pools for zero-latency rapid playback
       for (let i = 0; i < 4; i++) {

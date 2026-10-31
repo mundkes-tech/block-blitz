@@ -1,9 +1,11 @@
 import { BOARD_SIZE, type Board } from './board'
 import type { BlockShape } from './shapes'
 
-export function canPlaceShape(
+export type ShapeOffsets = readonly (readonly [number, number])[]
+
+export function canPlace(
   board: Board,
-  shape: BlockShape,
+  shape: ShapeOffsets,
   startRow: number,
   startCol: number,
 ): boolean {
@@ -12,30 +14,39 @@ export function canPlaceShape(
     !Number.isInteger(startCol) ||
     startRow < 0 ||
     startCol < 0 ||
-    shape.cells.length === 0
+    shape.length === 0
   ) {
     return false
   }
 
-  return shape.cells.every(({ row, col }) => {
-    if (
-      !Number.isInteger(row) ||
-      !Number.isInteger(col) ||
-      row < 0 ||
-      col < 0
-    ) {
-      return false
-    }
-
+  return shape.every(([row, col]) => {
     const boardRow = startRow + row
     const boardCol = startCol + col
 
     return (
+      Number.isInteger(row) &&
+      Number.isInteger(col) &&
+      row >= 0 &&
+      col >= 0 &&
       boardRow < BOARD_SIZE &&
       boardCol < BOARD_SIZE &&
       board[boardRow]?.[boardCol] === false
     )
   })
+}
+
+export function canPlaceShape(
+  board: Board,
+  shape: BlockShape,
+  startRow: number,
+  startCol: number,
+): boolean {
+  return canPlace(
+    board,
+    shape.cells.map(({ row, col }) => [row, col]),
+    startRow,
+    startCol,
+  )
 }
 
 export function placeShape(

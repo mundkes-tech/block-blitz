@@ -13,6 +13,10 @@ type PieceTrayProps = {
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void
   onPointerUp: (event: PointerEvent<HTMLDivElement>) => void
   onPointerCancel: (event: PointerEvent<HTMLDivElement>) => void
+  onKeyboardSelect?: (piece: Piece) => void
+  onKeyboardMove?: (piece: Piece, key: string) => void
+  onKeyboardPlace?: (piece: Piece) => void
+  onKeyboardCancel?: () => void
 }
 
 export function PieceTray({
@@ -25,6 +29,10 @@ export function PieceTray({
   onPointerMove,
   onPointerUp,
   onPointerCancel,
+  onKeyboardSelect,
+  onKeyboardMove,
+  onKeyboardPlace,
+  onKeyboardCancel,
 }: PieceTrayProps) {
   // We represent the 3 standard pieces slots
   const maxSlots = 3
@@ -91,9 +99,26 @@ export function PieceTray({
                   }${isReturning ? ' piece-preview--returning' : ''}`}
                   role="button"
                   tabIndex={locked ? -1 : 0}
-                  aria-label={`${piece.shape.name} piece, ${dimensions.rows} by ${dimensions.cols} blocks`}
+                  aria-label={`Piece ${slotIdx + 1}, ${piece.shape.name} shape${
+                    activePieceId === piece.id ? ', selected' : ''
+                  }`}
                   aria-disabled={locked}
-                  style={{ touchAction: 'none' }}
+                  data-piece-id={piece.id}
+                  style={{ touchAction: 'none', userSelect: 'none' }}
+                  onKeyDown={(event) => {
+                    if (locked) return
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      if (activePieceId === piece.id) onKeyboardPlace?.(piece)
+                      else onKeyboardSelect?.(piece)
+                    } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                      event.preventDefault()
+                      onKeyboardMove?.(piece, event.key)
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault()
+                      onKeyboardCancel?.()
+                    }
+                  }}
                   onPointerDown={(event) => {
                     if (locked) return
                     event.currentTarget.setPointerCapture(event.pointerId)
@@ -102,7 +127,6 @@ export function PieceTray({
                   onPointerMove={locked ? undefined : onPointerMove}
                   onPointerUp={locked ? undefined : onPointerUp}
                   onPointerCancel={locked ? undefined : onPointerCancel}
-                  onLostPointerCapture={locked ? undefined : onPointerCancel}
                 >
                   <div className="piece-grid" style={gridStyle}>
                     {piece.shape.cells.map(({ row, col }) => (

@@ -88,6 +88,7 @@ function GameBoard({
         hammerActive ? ' game-board--hammer' : ''
       }${locked ? ' game-board--locked' : ''}`}
       role="grid"
+      tabIndex={0}
       aria-label="8 by 8 game board"
       aria-disabled={locked}
     >
@@ -102,6 +103,8 @@ function GameBoard({
             <GridCell
               key={`${rowIndex}-${columnIndex}`}
               occupied={occupied}
+              row={rowIndex}
+              col={columnIndex}
               color={boardColors?.[rowIndex]?.[columnIndex]}
               pattern={boardPatterns?.[rowIndex]?.[columnIndex]}
               effect={

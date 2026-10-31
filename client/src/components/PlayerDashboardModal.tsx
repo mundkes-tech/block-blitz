@@ -234,6 +234,9 @@ export function PlayerDashboardModal({
                           <td className="history-date">{formatDate(item.completedAt)}</td>
                           <td className="history-score tabular-nums font-mono">
                             <strong>{item.score.toLocaleString()}</strong>
+                            {item.status === 'flagged' && (
+                              <small aria-label="Under review"> Under review</small>
+                            )}
                           </td>
                           <td className="history-lines tabular-nums font-mono">{item.linesCleared}</td>
                           <td className="history-combo tabular-nums font-mono">x{item.highestCombo ?? 1}</td>
@@ -279,7 +282,7 @@ export function PlayerDashboardModal({
             <div className="guest-hero-icon" aria-hidden="true">👤</div>
             <h3>Playing as Guest</h3>
             <p className="guest-explanation">
-              Your match scores and high records are currently stored locally in your browser session.
+              Sign in to track your match history and records across devices.
               To save your permanent stats, track complete match history, and compete on the global leaderboard, create a free player account!
             </p>
 
